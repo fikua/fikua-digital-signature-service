@@ -1,0 +1,14 @@
+services:
+  mock-qtsp:
+    build: .
+    container_name: mock-qtsp
+    ports:
+      - "9090:9090"
+    environment:
+      SERVER_PORT: 9090
+      CLIENT_ID: mock-client
+      CLIENT_SECRET: mock-secret
+      CREDENTIAL_ID: mock-credential-001
+      CREDENTIAL_PASSWORD: mock-password
+      TOKEN_TTL: 3600
+      SAD_TTL: 300
