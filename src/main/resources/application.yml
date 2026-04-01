@@ -1,0 +1,13 @@
+server:
+  port: ${SERVER_PORT:9090}
+
+mock-qtsp:
+  client-id: ${CLIENT_ID:mock-client}
+  client-secret: ${CLIENT_SECRET:mock-secret}
+  credential-id: ${CREDENTIAL_ID:mock-credential-001}
+  credential-password: ${CREDENTIAL_PASSWORD:mock-password}
+  certificate:
+    cert-path: ${CERT_PATH:classpath:certs/issuer-eseal.crt}
+    key-path: ${KEY_PATH:classpath:certs/issuer-eseal.key}
+  token-ttl-seconds: ${TOKEN_TTL:3600}
+  sad-ttl-seconds: ${SAD_TTL:300}
