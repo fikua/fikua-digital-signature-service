@@ -16,6 +16,9 @@ Thumbs.db
 # Certs (local dev only)
 certs/
 
+# Build output
+bin/
+
 # Logs
 *.log
 *.tar.gz

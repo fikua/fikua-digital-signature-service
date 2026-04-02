@@ -23,8 +23,8 @@ SSH_PORT="49222"
 SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -p ${SSH_PORT}"
 SCP_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -P ${SSH_PORT}"
 
-echo "==> Building Docker image: ${IMAGE_FULL}"
-docker build -t "${IMAGE_FULL}" .
+echo "==> Building Docker image: ${IMAGE_FULL} (linux/amd64)"
+docker build --platform linux/amd64 -t "${IMAGE_FULL}" .
 
 echo "==> Saving image to ${TAR_FILE}"
 docker save "${IMAGE_FULL}" | gzip > "${TAR_FILE}"
@@ -36,7 +36,7 @@ echo "==> Loading image on VPS"
 ssh ${SSH_OPTS} "${VPS_USER}@${VPS_IP}" "sudo docker load < /tmp/${TAR_FILE} && rm /tmp/${TAR_FILE}"
 
 echo "==> Restarting mock-qtsp container"
-ssh ${SSH_OPTS} "${VPS_USER}@${VPS_IP}" "cd /opt/eudistack && sudo docker compose up -d mock-qtsp"
+ssh ${SSH_OPTS} "${VPS_USER}@${VPS_IP}" "cd /opt/vps/eudistack && sudo docker compose --env-file .env -f compose.yaml up -d mock-qtsp"
 
 rm -f "${TAR_FILE}"
 echo "==> Done. mock-qtsp deployed as ${IMAGE_FULL}"
