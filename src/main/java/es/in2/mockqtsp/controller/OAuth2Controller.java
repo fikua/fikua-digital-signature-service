@@ -1,8 +1,8 @@
 package es.in2.mockqtsp.controller;
 
 import es.in2.mockqtsp.config.MockQtspProperties;
-import es.in2.mockqtsp.dto.ErrorResponse;
-import es.in2.mockqtsp.dto.TokenResponse;
+import es.in2.mockqtsp.dto.common.ErrorResponse;
+import es.in2.mockqtsp.dto.common.TokenResponse;
 import es.in2.mockqtsp.service.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

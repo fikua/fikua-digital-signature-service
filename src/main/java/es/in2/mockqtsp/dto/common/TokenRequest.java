@@ -1,4 +1,4 @@
-package es.in2.mockqtsp.dto;
+package es.in2.mockqtsp.dto.common;
 
 public record TokenRequest(
         String grant_type,
