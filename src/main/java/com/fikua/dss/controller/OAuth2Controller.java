@@ -1,9 +1,9 @@
-package es.in2.mockqtsp.controller;
+package com.fikua.dss.controller;
 
-import es.in2.mockqtsp.config.MockQtspProperties;
-import es.in2.mockqtsp.dto.ErrorResponse;
-import es.in2.mockqtsp.dto.TokenResponse;
-import es.in2.mockqtsp.service.TokenService;
+import com.fikua.dss.config.DssProperties;
+import com.fikua.dss.dto.ErrorResponse;
+import com.fikua.dss.dto.TokenResponse;
+import com.fikua.dss.service.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,9 +19,9 @@ public class OAuth2Controller {
     private static final Logger log = LoggerFactory.getLogger(OAuth2Controller.class);
 
     private final TokenService tokenService;
-    private final MockQtspProperties properties;
+    private final DssProperties properties;
 
-    public OAuth2Controller(TokenService tokenService, MockQtspProperties properties) {
+    public OAuth2Controller(TokenService tokenService, DssProperties properties) {
         this.tokenService = tokenService;
         this.properties = properties;
     }

@@ -1,4 +1,4 @@
-package es.in2.mockqtsp.service;
+package com.fikua.dss.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

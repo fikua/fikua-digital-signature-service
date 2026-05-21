@@ -1,3 +1,3 @@
-package es.in2.mockqtsp.dto;
+package com.fikua.dss.dto;
 
 public record CredentialsAuthorizeResponse(String SAD) {}

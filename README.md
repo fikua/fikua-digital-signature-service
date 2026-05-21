@@ -1,8 +1,8 @@
-# Mock QTSP — CSC v2 API Emulator
+# Digital Signature Service (DSS) — CSC v2 API
 
-Mock implementation of a Qualified Trust Service Provider (QTSP) exposing the Cloud Signature Consortium (CSC) v2 API. Designed for development and testing of the EUDIStack Issuer's remote signing flow.
+Spring Boot service implementing the Cloud Signature Consortium (CSC) v2 API. Initial mode is a mock Qualified Trust Service Provider (QTSP) for development and testing of remote signing flows; the roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
 
-**NOT for production use.** This service uses the same e-seal certificate as the Issuer for signing operations.
+**Mock mode is NOT for production use.** It signs with a static e-seal certificate provided at runtime.
 
 ## Endpoints
 
@@ -15,6 +15,7 @@ Mock implementation of a Qualified Trust Service Provider (QTSP) exposing the Cl
 | POST | `/csc/v2/credentials/authorize` | Get SAD (Signature Activation Data) |
 | POST | `/csc/v2/signatures/signHash` | Sign pre-computed hash(es) |
 | POST | `/csc/v2/signatures/signDoc` | Sign document(s) |
+| GET | `/health` | Health check |
 
 ## Configuration
 
@@ -34,7 +35,16 @@ All configuration via environment variables:
 
 ## Running with Docker
 
-1. Place the Issuer's e-seal certificate and key in `./certs/`:
+Pull from Docker Hub:
+
+```bash
+docker pull fikua/digital-signature-service:latest
+```
+
+Or build locally:
+
+1. Place the e-seal certificate and key in `./certs/`:
+
    ```
    certs/
      issuer-eseal.crt
@@ -42,6 +52,7 @@ All configuration via environment variables:
    ```
 
 2. Run:
+
    ```bash
    docker compose up -d
    ```
@@ -52,14 +63,14 @@ The service will be available at `http://localhost:9090`.
 
 ```bash
 ./gradlew bootJar
-java -jar build/libs/mock-qtsp-0.1.0.jar \
-  --mock-qtsp.certificate.cert-path=./certs/issuer-eseal.crt \
-  --mock-qtsp.certificate.key-path=./certs/issuer-eseal.key
+java -jar build/libs/digital-signature-service-0.2.0.jar \
+  --dss.certificate.cert-path=./certs/issuer-eseal.crt \
+  --dss.certificate.key-path=./certs/issuer-eseal.key
 ```
 
-## Issuer Configuration
+## Issuer configuration
 
-Configure the Issuer to use this mock via the runtime signing config API:
+Configure the Issuer to use this service via the runtime signing config API:
 
 ```bash
 curl -X PUT http://localhost:8080/internal/signing/config \
@@ -68,7 +79,7 @@ curl -X PUT http://localhost:8080/internal/signing/config \
     "provider": "csc-sign-hash",
     "remoteSignature": {
       "type": "cloud",
-      "url": "https://mock-qtsp.your-vps.com",
+      "url": "https://mock-qtsp.altia.fikua.com",
       "clientId": "mock-client",
       "clientSecret": "mock-secret",
       "credentialId": "mock-credential-001",
@@ -77,22 +88,20 @@ curl -X PUT http://localhost:8080/internal/signing/config \
   }'
 ```
 
-## Signing Flow
+## Signing flow
 
-```
-Issuer                              Mock QTSP
-  │                                     │
-  ├─ POST /oauth2/token ───────────────►│ (Basic auth, client_credentials)
-  │◄─── access_token ──────────────────┤
-  │                                     │
-  ├─ POST /csc/v2/credentials/info ───►│ (Bearer token)
-  │◄─── certificate chain + key info ──┤
-  │                                     │
-  ├─ POST /csc/v2/credentials/authorize►│ (hash + password)
-  │◄─── SAD ────────────────────────────┤
-  │                                     │
-  ├─ POST /csc/v2/signatures/signHash ─►│ (SAD + hash)
-  │◄─── signature ─────────────────────┤
-  │                                     │
-  └─ Assembles JWT: header.payload.sig  │
+```text
+Client                            DSS
+  │                                │
+  ├─ POST /oauth2/token ──────────►│ (Basic auth, client_credentials)
+  │◄─── access_token ──────────────┤
+  │                                │
+  ├─ POST /csc/v2/credentials/info►│ (Bearer token)
+  │◄─── certificate chain + key ───┤
+  │                                │
+  ├─ POST /csc/v2/credentials/authorize ►│ (hash + password)
+  │◄─── SAD ───────────────────────┤
+  │                                │
+  ├─ POST /csc/v2/signatures/signHash ►│ (SAD + hash)
+  │◄─── signature ─────────────────┤
 ```

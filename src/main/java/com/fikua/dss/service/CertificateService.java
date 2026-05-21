@@ -1,6 +1,6 @@
-package es.in2.mockqtsp.service;
+package com.fikua.dss.service;
 
-import es.in2.mockqtsp.config.MockQtspProperties;
+import com.fikua.dss.config.DssProperties;
 import jakarta.annotation.PostConstruct;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
@@ -26,13 +26,13 @@ public class CertificateService {
 
     private static final Logger log = LoggerFactory.getLogger(CertificateService.class);
 
-    private final MockQtspProperties properties;
+    private final DssProperties properties;
     private final ResourceLoader resourceLoader = new DefaultResourceLoader();
     private PrivateKey privateKey;
     private List<X509Certificate> certificateChain;
     private List<String> certificateChainBase64;
 
-    public CertificateService(MockQtspProperties properties) {
+    public CertificateService(DssProperties properties) {
         this.properties = properties;
     }
 

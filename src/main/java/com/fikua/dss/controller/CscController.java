@@ -1,10 +1,10 @@
-package es.in2.mockqtsp.controller;
+package com.fikua.dss.controller;
 
-import es.in2.mockqtsp.config.MockQtspProperties;
-import es.in2.mockqtsp.dto.*;
-import es.in2.mockqtsp.service.CertificateService;
-import es.in2.mockqtsp.service.SigningService;
-import es.in2.mockqtsp.service.TokenService;
+import com.fikua.dss.config.DssProperties;
+import com.fikua.dss.dto.*;
+import com.fikua.dss.service.CertificateService;
+import com.fikua.dss.service.SigningService;
+import com.fikua.dss.service.TokenService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -22,13 +22,13 @@ public class CscController {
 
     private static final Logger log = LoggerFactory.getLogger(CscController.class);
 
-    private final MockQtspProperties properties;
+    private final DssProperties properties;
     private final TokenService tokenService;
     private final CertificateService certificateService;
     private final SigningService signingService;
 
     public CscController(
-            MockQtspProperties properties,
+            DssProperties properties,
             TokenService tokenService,
             CertificateService certificateService,
             SigningService signingService

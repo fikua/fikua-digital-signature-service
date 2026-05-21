@@ -1,9 +1,9 @@
-package es.in2.mockqtsp.config;
+package com.fikua.dss.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "mock-qtsp")
-public record MockQtspProperties(
+@ConfigurationProperties(prefix = "dss")
+public record DssProperties(
         String clientId,
         String clientSecret,
         String credentialId,

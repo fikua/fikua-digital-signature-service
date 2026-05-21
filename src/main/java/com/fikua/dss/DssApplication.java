@@ -1,12 +1,12 @@
-package es.in2.mockqtsp;
+package com.fikua.dss;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class MockQtspApplication {
+public class DssApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(MockQtspApplication.class, args);
+        SpringApplication.run(DssApplication.class, args);
     }
 }

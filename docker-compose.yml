@@ -1,7 +1,7 @@
 services:
-  mock-qtsp:
+  dss:
     build: .
-    container_name: mock-qtsp
+    container_name: digital-signature-service
     ports:
       - "9090:9090"
     environment:

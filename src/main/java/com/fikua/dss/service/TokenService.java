@@ -1,6 +1,6 @@
-package es.in2.mockqtsp.service;
+package com.fikua.dss.service;
 
-import es.in2.mockqtsp.config.MockQtspProperties;
+import com.fikua.dss.config.DssProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,11 +15,11 @@ public class TokenService {
 
     private static final Logger log = LoggerFactory.getLogger(TokenService.class);
 
-    private final MockQtspProperties properties;
+    private final DssProperties properties;
     private final Map<String, Instant> activeTokens = new ConcurrentHashMap<>();
     private final Map<String, SadEntry> activeSads = new ConcurrentHashMap<>();
 
-    public TokenService(MockQtspProperties properties) {
+    public TokenService(DssProperties properties) {
         this.properties = properties;
     }
 

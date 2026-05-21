@@ -1,6 +1,6 @@
-package es.in2.mockqtsp.controller;
+package com.fikua.dss.controller;
 
-import es.in2.mockqtsp.service.CertificateService;
+import com.fikua.dss.service.CertificateService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

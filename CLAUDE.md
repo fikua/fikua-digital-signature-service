@@ -1,16 +1,15 @@
-# Mock QTSP — Repo Guide for Claude
+# Digital Signature Service — Repo Guide for Claude
 
-> **Per-repo CLAUDE.md.** Loaded only when working inside this repo. The
-> SDD Constitution lives in `../eudistack-platform-dev/CLAUDE.md`.
+> **Per-repo CLAUDE.md.** Loaded only when working inside this repo.
 
 ## Identity
 
-Mock Qualified Trust Service Provider (**QTSP**) implementing CSC API
-v2.0 for local development and CI testing. Stands in for real QTSPs
-(Altia, Sello de Tiempo, etc.) when developing signing flows in the
-Issuer / EBW.
+Spring Boot service implementing the **Cloud Signature Consortium (CSC) API
+v2.0**. Initial mode is a mock QTSP for local development and CI testing
+of signing flows (Issuer / EBW). Roadmap: incorporate real DSS (Digital
+Signature Service — European Commission).
 
-**Never deploy to production.** This is a dev/test fixture.
+**Mock mode is dev/test only — never deploy to production as a real QTSP.**
 
 ## Tech stack
 
@@ -20,46 +19,45 @@ Issuer / EBW.
 
 ## Architecture
 
-Minimal hexagonal layout. Implements just the CSC API v2.0 endpoints
-needed by Issuer and EBW to test signing flows.
-
-Strict rules (apply because it's Java):
-`../eudistack-platform-dev/.claude/rules/hexagonal-discipline.md`.
+Minimal hexagonal layout. Java package root: `com.fikua.dss`. Implements
+the CSC API v2.0 endpoints needed by Issuer and EBW to test signing flows.
 
 ## Common commands
 
-> **Runs in Docker** as part of `make up` from `eudistack-platform-dev`.
-
-| Task | Command |
-|------|---------|
-| Compile | `./gradlew compileJava` |
-| Tests | `./gradlew test` |
-| Full check | `./gradlew check` |
-| Rebuild Docker image | `cd ../eudistack-platform-dev && make rebuild-mock-qtsp` |
+| Task        | Command                |
+| ----------- | ---------------------- |
+| Compile     | `./gradlew compileJava`|
+| Tests       | `./gradlew test`       |
+| Full check  | `./gradlew check`      |
+| Build JAR   | `./gradlew bootJar`    |
+| Run locally | `./gradlew bootRun`    |
 
 ## CSC API v2.0 endpoints implemented
 
 - `/csc/v2/info`
-- `/csc/v2/auth/login`
 - `/csc/v2/credentials/list`
 - `/csc/v2/credentials/info`
 - `/csc/v2/credentials/authorize`
 - `/csc/v2/signatures/signHash`
+- `/csc/v2/signatures/signDoc`
 
 Use the same DTOs that real QTSPs expose so tests can swap targets via
 config.
 
-## Where to find specs
+## Release & deployment
 
-`../eudistack-platform-dev/docs/EUDISTACK-10-qtsp-signing/`.
+- **Image:** `fikua/digital-signature-service` on Docker Hub (public).
+- **CI/CD:** `.github/workflows/release.yml` builds and pushes on push to
+  `main` (tag `latest`) and on `v*.*.*` tags (semver tags).
+- **VPS:** manual deploy via `deploy.sh` to OVH VPS, endpoint
+  `mock-qtsp.altia.fikua.com` (endpoint name kept for compatibility with
+  existing STG seeds/configs).
 
 ## Git workflow
 
-- **Squash merge to `main`.** Conventional Commits + Story footer.
+- **Squash merge to `main`.** Conventional Commits.
 
 ## References
 
-- Constitution: [`../eudistack-platform-dev/CLAUDE.md`](../eudistack-platform-dev/CLAUDE.md)
 - CSC API v2.0 spec: <https://cloudsignatureconsortium.org/resources/>
-- Skills: `java-spring-hexagonal`, `commit-conventions`
-- Rules: `hexagonal-discipline`, `protocol-compliance`
+- DSS (European Commission): <https://github.com/esig/dss>

@@ -1,4 +1,4 @@
-package es.in2.mockqtsp.dto;
+package com.fikua.dss.dto;
 
 import java.util.List;
 

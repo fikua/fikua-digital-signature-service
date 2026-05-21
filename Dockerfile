@@ -9,6 +9,6 @@ FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S nonroot && adduser -S nonroot -G nonroot
 USER nonroot
 WORKDIR /app
-COPY --from=build /workspace/build/libs/*.jar /app/mock-qtsp.jar
+COPY --from=build /workspace/build/libs/*.jar /app/dss.jar
 EXPOSE 9090
-ENTRYPOINT ["java", "-jar", "/app/mock-qtsp.jar"]
+ENTRYPOINT ["java", "-jar", "/app/dss.jar"]
