@@ -2,6 +2,6 @@ FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S nonroot && adduser -S nonroot -G nonroot
 USER nonroot
 WORKDIR /app
-COPY build/libs/digital-signature-service-*.jar /app/dss.jar
+COPY build/libs/fikua-digital-signature-service-*.jar /app/dss.jar
 EXPOSE 9090
 ENTRYPOINT ["java", "-jar", "/app/dss.jar"]

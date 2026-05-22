@@ -69,6 +69,7 @@ Service listens at `http://localhost:9090`.
 java -jar build/libs/fikua-digital-signature-service-0.3.0.jar \
     --dss.certificate.cert-path=file:./certs/mock-eseal.crt \
     --dss.certificate.key-path=file:./certs/mock-eseal.key
+# (the boot JAR name follows rootProject.name + version in settings.gradle / build.gradle)
 ```
 
 ## Issuer / client configuration

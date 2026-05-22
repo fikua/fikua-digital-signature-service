@@ -7,6 +7,9 @@
 build/
 bin/
 
+# Exception: Dockerfile.runtime needs the prebuilt boot JAR
+!build/libs/*.jar
+
 # Certificates — must be mounted at runtime, never baked in
 certs/
 **/certs/
