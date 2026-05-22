@@ -34,7 +34,10 @@ jobs:
 
       - name: Install cloudflared
         run: |
-          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+          # --proto =https --tlsv1.2 refuses to follow redirects that drop
+          # to http, satisfies SonarCloud githubactions:S6506.
+          curl --proto '=https' --tlsv1.2 -fsSL \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
             -o /usr/local/bin/cloudflared
           chmod +x /usr/local/bin/cloudflared
           cloudflared --version
