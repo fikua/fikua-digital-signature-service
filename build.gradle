@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '3.4.4'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.sonarqube' version '7.3.0.8198'
@@ -9,6 +10,25 @@ sonar {
     properties {
         property 'sonar.projectKey', 'fikua_fikua-digital-signature-service'
         property 'sonar.organization', 'fikua'
+        property 'sonar.coverage.jacoco.xmlReportPaths',
+                "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml"
+    }
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy 'jacocoTestReport'   // generate the report after tests run
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn 'test'
+    reports {
+        xml.required = true          // required by SonarCloud
+        html.required = true         // handy when reviewing locally
     }
 }
 
@@ -34,6 +54,3 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-}

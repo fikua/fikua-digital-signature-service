@@ -39,4 +39,7 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew build sonar --info
+        # Order matters: tests must run before sonar so JaCoCo has data, and
+        # jacocoTestReport must run before sonar so the XML report exists at
+        # the path SonarCloud is told about (sonar.coverage.jacoco.xmlReportPaths).
+        run: ./gradlew test jacocoTestReport sonar --info
