@@ -5,6 +5,7 @@ import com.fikua.dss.dto.*;
 import com.fikua.dss.service.CertificateService;
 import com.fikua.dss.service.SigningService;
 import com.fikua.dss.service.TokenService;
+import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -80,7 +81,8 @@ public class CscController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        log.info("POST /csc/v2/credentials/info credentialID={}", request.credentialID());
+        log.info("POST /csc/v2/credentials/info credentialID={}",
+                LogSanitizer.clean(request.credentialID()));
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -118,7 +120,7 @@ public class CscController {
             @RequestBody CredentialsAuthorizeRequest request
     ) {
         log.info("POST /csc/v2/credentials/authorize credentialID={} numSignatures={}",
-                request.credentialID(), request.numSignatures());
+                LogSanitizer.clean(request.credentialID()), request.numSignatures());
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -143,7 +145,8 @@ public class CscController {
             @RequestBody SignHashRequest request
     ) {
         log.info("POST /csc/v2/signatures/signHash credentialID={} hashes={}",
-                request.credentialID(), request.hash() != null ? request.hash().size() : 0);
+                LogSanitizer.clean(request.credentialID()),
+                request.hash() != null ? request.hash().size() : 0);
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -162,7 +165,8 @@ public class CscController {
             @RequestBody SignDocRequest request
     ) {
         log.info("POST /csc/v2/signatures/signDoc credentialID={} docs={}",
-                request.credentialID(), request.documents() != null ? request.documents().size() : 0);
+                LogSanitizer.clean(request.credentialID()),
+                request.documents() != null ? request.documents().size() : 0);
         var error = validateBearer(authHeader);
         if (error != null) return error;
 

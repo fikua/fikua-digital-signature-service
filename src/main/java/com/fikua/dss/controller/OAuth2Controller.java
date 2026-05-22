@@ -4,6 +4,7 @@ import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.dto.ErrorResponse;
 import com.fikua.dss.dto.TokenResponse;
 import com.fikua.dss.service.TokenService;
+import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -33,7 +34,8 @@ public class OAuth2Controller {
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "authorization_details", required = false) String authorizationDetails
     ) {
-        log.info("POST /oauth2/token grant_type={} scope={}", grantType, scope);
+        log.info("POST /oauth2/token grant_type={} scope={}",
+                LogSanitizer.clean(grantType), LogSanitizer.clean(scope));
 
         if (!"client_credentials".equals(grantType)) {
             return ResponseEntity.badRequest().body(
@@ -61,4 +63,5 @@ public class OAuth2Controller {
                     new ErrorResponse("invalid_client", e.getMessage()));
         }
     }
+
 }
