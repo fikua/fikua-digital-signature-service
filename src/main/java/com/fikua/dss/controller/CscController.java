@@ -81,8 +81,10 @@ public class CscController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        log.info("POST /csc/v2/credentials/info credentialID={}",
-                LogSanitizer.clean(request.credentialID()));
+        if (log.isInfoEnabled()) {
+            log.info("POST /csc/v2/credentials/info credentialID={}",
+                    LogSanitizer.clean(request.credentialID()));
+        }
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -119,8 +121,10 @@ public class CscController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsAuthorizeRequest request
     ) {
-        log.info("POST /csc/v2/credentials/authorize credentialID={} numSignatures={}",
-                LogSanitizer.clean(request.credentialID()), request.numSignatures());
+        if (log.isInfoEnabled()) {
+            log.info("POST /csc/v2/credentials/authorize credentialID={} numSignatures={}",
+                    LogSanitizer.clean(request.credentialID()), request.numSignatures());
+        }
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -144,9 +148,11 @@ public class CscController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignHashRequest request
     ) {
-        log.info("POST /csc/v2/signatures/signHash credentialID={} hashes={}",
-                LogSanitizer.clean(request.credentialID()),
-                request.hash() != null ? request.hash().size() : 0);
+        if (log.isInfoEnabled()) {
+            log.info("POST /csc/v2/signatures/signHash credentialID={} hashes={}",
+                    LogSanitizer.clean(request.credentialID()),
+                    request.hash() != null ? request.hash().size() : 0);
+        }
         var error = validateBearer(authHeader);
         if (error != null) return error;
 
@@ -164,9 +170,11 @@ public class CscController {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignDocRequest request
     ) {
-        log.info("POST /csc/v2/signatures/signDoc credentialID={} docs={}",
-                LogSanitizer.clean(request.credentialID()),
-                request.documents() != null ? request.documents().size() : 0);
+        if (log.isInfoEnabled()) {
+            log.info("POST /csc/v2/signatures/signDoc credentialID={} docs={}",
+                    LogSanitizer.clean(request.credentialID()),
+                    request.documents() != null ? request.documents().size() : 0);
+        }
         var error = validateBearer(authHeader);
         if (error != null) return error;
 

@@ -21,28 +21,38 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String INVALID_REQUEST = "invalid_request";
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e) {
-        log.warn("Malformed request body: {}", LogSanitizer.clean(e.getMostSpecificCause().getMessage()));
+        if (log.isWarnEnabled()) {
+            log.warn("Malformed request body: {}",
+                    LogSanitizer.clean(e.getMostSpecificCause().getMessage()));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("invalid_request", "Malformed request body"));
+                .body(new ErrorResponse(INVALID_REQUEST, "Malformed request body"));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e) {
-        log.warn("Missing required parameter: {}", LogSanitizer.clean(e.getParameterName()));
+        var safeName = LogSanitizer.clean(e.getParameterName());
+        if (log.isWarnEnabled()) {
+            log.warn("Missing required parameter: {}", safeName);
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("invalid_request",
-                        "Missing required parameter: " + LogSanitizer.clean(e.getParameterName())));
+                .body(new ErrorResponse(INVALID_REQUEST,
+                        "Missing required parameter: " + safeName));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
-        log.warn("Missing required header: {}", LogSanitizer.clean(e.getHeaderName()));
+        var safeName = LogSanitizer.clean(e.getHeaderName());
+        if (log.isWarnEnabled()) {
+            log.warn("Missing required header: {}", safeName);
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("invalid_request",
-                        "Missing required header: " + LogSanitizer.clean(e.getHeaderName())));
+                .body(new ErrorResponse(INVALID_REQUEST,
+                        "Missing required header: " + safeName));
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)
@@ -53,7 +63,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ErrorResponse> handleSecurity(SecurityException e) {
-        log.warn("Security violation: {}", LogSanitizer.clean(e.getMessage()));
+        if (log.isWarnEnabled()) {
+            log.warn("Security violation: {}", LogSanitizer.clean(e.getMessage()));
+        }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("invalid_client", e.getMessage()));
     }

@@ -55,8 +55,10 @@ public class TokenService {
         var sad = UUID.randomUUID().toString();
         var expiry = Instant.now().plusSeconds(properties.sadTtlSeconds());
         activeSads.put(sad, new SadEntry(credentialId, expiry));
-        log.info("Issued SAD for credential {}, expires at {}",
-                LogSanitizer.clean(credentialId), expiry);
+        if (log.isInfoEnabled()) {
+            log.info("Issued SAD for credential {}, expires at {}",
+                    LogSanitizer.clean(credentialId), expiry);
+        }
         return sad;
     }
 

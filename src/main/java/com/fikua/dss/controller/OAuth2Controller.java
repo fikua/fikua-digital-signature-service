@@ -34,8 +34,10 @@ public class OAuth2Controller {
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "authorization_details", required = false) String authorizationDetails
     ) {
-        log.info("POST /oauth2/token grant_type={} scope={}",
-                LogSanitizer.clean(grantType), LogSanitizer.clean(scope));
+        if (log.isInfoEnabled()) {
+            log.info("POST /oauth2/token grant_type={} scope={}",
+                    LogSanitizer.clean(grantType), LogSanitizer.clean(scope));
+        }
 
         if (!"client_credentials".equals(grantType)) {
             return ResponseEntity.badRequest().body(
