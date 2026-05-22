@@ -1,0 +1,10 @@
+Fikua Digital Signature Service
+Copyright 2026 Fikua
+
+This product includes software developed by Fikua
+(https://fikua.com).
+
+This product includes software developed by third parties:
+  - Spring Boot (https://spring.io/projects/spring-boot) — Apache-2.0
+  - BouncyCastle (https://www.bouncycastle.org/) — MIT-style (BC license)
+  - Nimbus JOSE+JWT (https://connect2id.com/products/nimbus-jose-jwt) — Apache-2.0
