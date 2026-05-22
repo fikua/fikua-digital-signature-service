@@ -12,24 +12,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and shipped it inside the published Docker image. The Docker Hub repository
   was wiped and re-created under the new image name; the embedded key is
   considered compromised and must be rotated wherever it was used.
+- **Log injection (CWE-117 / Sonar S5145)** fixed: every log statement that
+  consumes request-derived input (grant_type, scope, credentialID, …) goes
+  through `LogSanitizer.clean(...)` which strips CR/LF/tab/control chars and
+  caps length at 200.
+- **Security headers** added on every response: HSTS, X-Content-Type-Options,
+  X-Frame-Options, Referrer-Policy, Cache-Control no-store.
 
 ### Changed
 - **Renamed Docker image** to `fikua/fikua-digital-signature-service` (was
   `fikua/digital-signature-service`). Repository renamed to match.
+- **Renamed Gradle project** to `fikua-digital-signature-service` (so the
+  boot JAR is now `fikua-digital-signature-service-<version>.jar`).
 - **Certificate loading is now filesystem-only.** Defaults to
   `file:/certs/mock-eseal.{crt,key}`; the host must mount its own certs
   read-only at runtime.
+- **`/health` is now Spring Boot Actuator** (`{"status":"UP","components":…}`)
+  instead of the previous bespoke JSON shape. The custom `HealthController`
+  has been removed; a `CertificateHealthIndicator` exposes cert validity and
+  signing-key state as a `certificate` component.
 - `deploy.sh` now goes through Cloudflare Tunnel (`vps.fikua.com`) instead of
   raw SSH + port 49222.
 - `docker-compose.yml` mounts `./certs:/certs:ro` and points at the new image
   name + filesystem defaults.
 
 ### Added
+- **Production-readiness**:
+  - Spring Boot Actuator with `/health` (+ liveness/readiness probes) and
+    `/info` exposed at root.
+  - Structured JSON logs via `logstash-logback-encoder`, with the OTEL
+    `trace_id` / `span_id` and a per-request `X-Request-Id` propagated
+    through MDC. Bootstrap noise demoted to WARN; banner off.
+  - OpenAPI 3 (`/v3/api-docs`) and Swagger UI (`/swagger-ui.html`) via
+    springdoc-openapi 2.7.0, with OAuth2 client_credentials + Bearer
+    security schemes declared.
+  - OpenTelemetry Java instrumentation 2.10.0 wired in; exporters default
+    to `none` and become active when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+  - Global `@RestControllerAdvice` mapping framework exceptions and
+    unexpected errors to typed `ErrorResponse` JSON.
+  - Graceful shutdown (30s phase) and tighter request body limits.
+- **CI / quality**:
+  - SonarCloud workflow (`.github/workflows/build.yml`) running on push to
+    `main` and on every PR.
+  - JaCoCo Gradle plugin (0.8.13) with XML report wired into Sonar
+    (`sonar.coverage.jacoco.xmlReportPaths`).
+  - Branch protection on `main`: required PR + status checks
+    (`build-and-push`, `build`), no force-push, no deletion, linear
+    history, conversation resolution.
+- **Tests**: real Spring context + MockMvc tests for `OAuth2Controller`,
+  `CscController` (all 6 endpoints, happy + error paths), Actuator probes,
+  global exception handler, plus pure unit tests for `TokenService`,
+  `LogSanitizer`, `GlobalExceptionHandler` and `CertificateHealthIndicator`.
+  Local coverage: 92% line, 91% instruction, 100% class.
 - `LICENSE` (Apache-2.0, copyright Fikua) and `NOTICE` file.
-- `.dockerignore` blocking any cert/key material from being baked into images.
+- `.dockerignore` blocking any cert/key material from being baked into
+  images.
 - `.gitignore` hardened with `**/certs/`, `*.pem`, `*.key`, `*.crt`, `*.p12`,
   `*.pfx`, `*.jks`.
-- README rewritten with mock-cert quick-start and Apache-2.0 license note.
+- README rewritten with mock-cert quick-start, production-readiness section,
+  OpenAPI pointers and Apache-2.0 license note.
 
 ## [0.1.0] - 2026-04-02
 

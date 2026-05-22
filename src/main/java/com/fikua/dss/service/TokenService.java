@@ -1,6 +1,7 @@
 package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
+import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -54,7 +55,10 @@ public class TokenService {
         var sad = UUID.randomUUID().toString();
         var expiry = Instant.now().plusSeconds(properties.sadTtlSeconds());
         activeSads.put(sad, new SadEntry(credentialId, expiry));
-        log.info("Issued SAD for credential {}, expires at {}", credentialId, expiry);
+        if (log.isInfoEnabled()) {
+            log.info("Issued SAD for credential {}, expires at {}",
+                    LogSanitizer.clean(credentialId), expiry);
+        }
         return sad;
     }
 
