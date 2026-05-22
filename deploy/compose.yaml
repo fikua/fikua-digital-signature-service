@@ -1,0 +1,97 @@
+# Digital Signature Service (formerly mock-qtsp)
+#
+# Standalone deployment, sibling to the lab backend but not coupled to it.
+#
+# Source repo:  github.com/fikua/fikua-digital-signature-service
+# Image:        docker.io/fikua/fikua-digital-signature-service
+# Public URL:   https://mock-qtsp.altia.fikua.com
+#
+# Routing during coexistence:
+#   - nginx still terminates :443 on the host and reverse-proxies to
+#     127.0.0.1:9090 (legacy path; will be removed at cut-over).
+#   - Traefik also routes via labels on the traefik-public network; today
+#     it listens on :8081 (web) / :8444 (websecure) so it does not collide
+#     with nginx. When we cut over, nginx is stopped and Traefik takes
+#     over :80 / :443.
+#
+# Certificates are mounted from the host. The published image does NOT
+# embed certs in the JAR (intentional: certs should never ship inside a
+# public image). The cert + key live at:
+#   /opt/vps/projects/fikua-lab/dss/certs/issuer-eseal.{crt,key}
+# and are mounted read-only into the container.
+#
+# Source of truth for this file:
+#   fikua-platform-iac/projects/fikua-lab/dss/compose.yaml
+# Host path on the VPS:
+#   /opt/vps/projects/fikua-lab/dss/
+
+services:
+  dss:
+    image: fikua/fikua-digital-signature-service:${DSS_VERSION:-latest}
+    container_name: fikua-digital-signature-service
+    restart: unless-stopped
+    # Kept for nginx coexistence. Drop once the cut-over to Traefik is done.
+    ports:
+      - "127.0.0.1:9090:9090"
+    environment:
+      SERVER_PORT: 9090
+      CLIENT_ID: ${DSS_CLIENT_ID:-mock-client}
+      CLIENT_SECRET: ${DSS_CLIENT_SECRET:-mock-secret}
+      CREDENTIAL_ID: ${DSS_CREDENTIAL_ID:-mock-credential-001}
+      CREDENTIAL_PASSWORD: ${DSS_CREDENTIAL_PASSWORD:-mock-password}
+      TOKEN_TTL: ${DSS_TOKEN_TTL:-3600}
+      SAD_TTL: ${DSS_SAD_TTL:-300}
+      CERT_PATH: file:/certs/issuer-eseal.crt
+      KEY_PATH: file:/certs/issuer-eseal.key
+      # OpenTelemetry exporters stay silent until an OTLP endpoint is set.
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
+      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-none}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-none}
+    volumes:
+      - ./certs:/certs:ro
+    networks:
+      # Internal default network for healthcheck loopback, plus Traefik fabric.
+      - default
+      - traefik-public
+    labels:
+      traefik.enable: "true"
+      # Route everything destined for mock-qtsp.altia.fikua.com to this
+      # container. We keep the legacy hostname so existing STG seeds keep
+      # working; we will introduce dss.fikua.com later via the same
+      # router with an alternative Host() rule.
+      traefik.http.routers.dss.rule: "Host(`mock-qtsp.altia.fikua.com`)"
+      traefik.http.routers.dss.entrypoints: "web"
+      traefik.http.routers.dss.service: "dss"
+      traefik.http.services.dss.loadbalancer.server.port: "9090"
+      # Health-aware load balancing so a DOWN cert/key indicator removes the
+      # container from rotation.
+      traefik.http.services.dss.loadbalancer.healthcheck.path: "/health"
+      traefik.http.services.dss.loadbalancer.healthcheck.port: "9090"
+      traefik.http.services.dss.loadbalancer.healthcheck.interval: "30s"
+      traefik.http.services.dss.loadbalancer.healthcheck.timeout: "5s"
+    healthcheck:
+      # /health is Spring Boot Actuator since 0.3.x: status code is 200 when
+      # the cert + signing key components are UP, 503 otherwise. We also grep
+      # the body so we fail fast if the shape ever drifts.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+networks:
+  # Shared L7 fabric defined by platform-services. Containers join it to be
+  # discoverable by Traefik via container labels.
+  traefik-public:
+    name: traefik-public
+    external: true
