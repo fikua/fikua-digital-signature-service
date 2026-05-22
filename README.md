@@ -7,6 +7,8 @@ Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0]
 
 ## Endpoints
 
+### CSC v2 API
+
 | Method | Path                            | Description                                |
 | ------ | ------------------------------- | ------------------------------------------ |
 | POST   | `/oauth2/token`                 | OAuth2 `client_credentials` token endpoint |
@@ -16,7 +18,17 @@ Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0]
 | POST   | `/csc/v2/credentials/authorize` | Get SAD (Signature Activation Data)        |
 | POST   | `/csc/v2/signatures/signHash`   | Sign pre-computed hash(es)                 |
 | POST   | `/csc/v2/signatures/signDoc`    | Sign document(s)                           |
-| GET    | `/health`                       | Health check (cert validity + signing key) |
+
+### Observability and operations
+
+| Method | Path                | Description                                                            |
+| ------ | ------------------- | ---------------------------------------------------------------------- |
+| GET    | `/health`           | Spring Boot Actuator health (cert validity + signing key + readiness)  |
+| GET    | `/health/liveness`  | Kubernetes-style liveness probe                                        |
+| GET    | `/health/readiness` | Readiness probe (includes the `certificate` indicator)                 |
+| GET    | `/info`             | Build, Java and OS metadata                                            |
+| GET    | `/v3/api-docs`      | OpenAPI 3 specification                                                |
+| GET    | `/swagger-ui.html`  | Interactive Swagger UI (lets you authenticate against `/oauth2/token`) |
 
 ## Configuration
 
@@ -110,12 +122,28 @@ Client                                  DSS
   │◄─── signature ───────────────────────┤
 ```
 
+## Production readiness
+
+- **Health probes** at `/health`, `/health/liveness`, `/health/readiness` via Spring Boot Actuator. A custom `certificate` component reports DOWN when the cert is expired, not yet valid, or the private key is missing.
+- **Structured logging**: `logstash-logback-encoder` emits JSON in production and a human-readable line in `local` / `dev` profiles. Bootstrap noise from autoconfigure, Tomcat, OpenTelemetry and Springdoc is demoted to WARN; the Spring banner is off.
+- **Correlation**: every response carries an `X-Request-Id` header (honours an incoming one or generates a UUID). The same id is in the MDC alongside OTEL `trace_id` / `span_id`.
+- **OpenTelemetry**: `opentelemetry-spring-boot-starter` is wired in. Exporters default to `none`; set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_TRACES_EXPORTER=otlp` (etc.) to enable.
+- **Security headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security` and `Cache-Control: no-store` on every response.
+- **Graceful shutdown** (30 s phase) plus a global `@RestControllerAdvice` that maps known framework exceptions and unexpected errors to a typed `ErrorResponse`.
+
+## OpenAPI / Swagger
+
+Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive UI is at [`/swagger-ui.html`](http://localhost:9090/swagger-ui.html). The OAuth2 `client_credentials` flow is declared, so you can use the "Authorize" button in the UI to mint a token against `/oauth2/token` and call the rest of the endpoints from the browser.
+
 ## Tech stack
 
 - Java 25 (Gradle toolchain)
-- Spring Boot 3.4.4
+- Spring Boot 3.4.4 + Spring Boot Actuator
 - BouncyCastle 1.80 (signing primitives)
 - Nimbus JOSE+JWT 9.40 (token signing)
+- springdoc-openapi 2.7.0 (OpenAPI + Swagger UI)
+- OpenTelemetry Java instrumentation 2.10.0
+- Logback + logstash-logback-encoder 8.0 (JSON logs)
 
 ## Releases
 
