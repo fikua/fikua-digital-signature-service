@@ -51,31 +51,35 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # SSH key for the VPS user (ubuntu).
-          printf '%s' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/vps_id
+          # SSH key for the VPS user (ubuntu). GitHub secret storage strips
+          # any trailing newline, but OpenSSH refuses to parse the key
+          # without it ("error in libcrypto"). printf %s\n adds it back.
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/vps_id
           chmod 600 ~/.ssh/vps_id
 
-          # cloudflared access via service token (Cloudflare Access policies
-          # must allow this service token on the hostname).
-          cat <<EOF > ~/.cloudflared-env
-          export TUNNEL_SERVICE_TOKEN_ID="$CF_ACCESS_CLIENT_ID"
-          export TUNNEL_SERVICE_TOKEN_SECRET="$CF_ACCESS_CLIENT_SECRET"
-          EOF
-          chmod 600 ~/.cloudflared-env
+          # Sanity-check the key locally so the next step fails fast if the
+          # secret contents are wrong, instead of a confusing scp 255 later.
+          ssh-keygen -y -f ~/.ssh/vps_id >/dev/null
 
-          # SSH config that routes vps.fikua.com through the tunnel and
-          # injects the Cloudflare Access service token headers.
+          # SSH config that routes vps.fikua.com through the Cloudflare
+          # Access tunnel. cloudflared picks up the service token from the
+          # CF-Access-Client-{Id,Secret} env vars automatically.
           cat <<'EOF' > ~/.ssh/config
           Host vps.fikua.com
               User ubuntu
               IdentityFile ~/.ssh/vps_id
               IdentitiesOnly yes
               StrictHostKeyChecking accept-new
-              ProxyCommand sh -c '. ~/.cloudflared-env && cloudflared access ssh --hostname %h --service-token-id "$TUNNEL_SERVICE_TOKEN_ID" --service-token-secret "$TUNNEL_SERVICE_TOKEN_SECRET"'
+              ProxyCommand cloudflared access ssh --hostname %h
               ServerAliveInterval 30
               ServerAliveCountMax 4
           EOF
           chmod 600 ~/.ssh/config
+
+          # Persist the service-token envs so subsequent steps inherit them
+          # (this is how cloudflared finds them at ProxyCommand time).
+          echo "CF_ACCESS_CLIENT_ID=$CF_ACCESS_CLIENT_ID" >> "$GITHUB_ENV"
+          echo "CF_ACCESS_CLIENT_SECRET=$CF_ACCESS_CLIENT_SECRET" >> "$GITHUB_ENV"
 
       - name: Copy compose.yaml from platform-iac source of truth
         # The compose file lives in the platform-iac repo, but to keep this
