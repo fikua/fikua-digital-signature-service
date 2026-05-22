@@ -1,0 +1,28 @@
+# Never ship into images
+.git/
+.github/
+.idea/
+.vscode/
+.gradle/
+build/
+bin/
+
+# Certificates — must be mounted at runtime, never baked in
+certs/
+**/certs/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+
+# Local docs / scratch
+*.log
+*.tar.gz
+.DS_Store
+README.md
+CHANGELOG.md
+CLAUDE.md
+docker-compose.yml
+deploy.sh

@@ -1,6 +1,15 @@
+# Local development only. Builds the image from the Dockerfile and
+# mounts a host certs/ folder (gitignored) into the container.
+#
+# Before first run:
+#   1. Generate or copy a test e-seal cert + key into ./certs/
+#      (see README "Generate a mock cert" section).
+#   2. docker compose up --build
+
 services:
   dss:
     build: .
+    image: fikua/fikua-digital-signature-service:dev
     container_name: digital-signature-service
     ports:
       - "9090:9090"
@@ -12,3 +21,7 @@ services:
       CREDENTIAL_PASSWORD: mock-password
       TOKEN_TTL: 3600
       SAD_TTL: 300
+      CERT_PATH: file:/certs/mock-eseal.crt
+      KEY_PATH: file:/certs/mock-eseal.key
+    volumes:
+      - ./certs:/certs:ro

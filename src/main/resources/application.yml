@@ -7,7 +7,7 @@ dss:
   credential-id: ${CREDENTIAL_ID:mock-credential-001}
   credential-password: ${CREDENTIAL_PASSWORD:mock-password}
   certificate:
-    cert-path: ${CERT_PATH:classpath:certs/issuer-eseal.crt}
-    key-path: ${KEY_PATH:classpath:certs/issuer-eseal.key}
+    cert-path: ${CERT_PATH:file:/certs/mock-eseal.crt}
+    key-path: ${KEY_PATH:file:/certs/mock-eseal.key}
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}

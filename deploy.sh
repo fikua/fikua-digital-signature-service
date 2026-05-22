@@ -1,32 +1,25 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Deploy digital-signature-service image to OVH VPS
+# Pull the published image on the Fikua VPS and restart the dss service.
 #
 # Usage:
-#   ./deploy.sh
+#   ./deploy.sh             # deploys :latest
+#   TAG=0.3.0 ./deploy.sh   # specific version
 #
-# Pulls the published image from Docker Hub on the VPS and restarts the
-# container via docker compose. Preferred path now that CI publishes to
-# fikua/digital-signature-service on every main/tag push.
-# =============================================================================
+# Image source: fikua/fikua-digital-signature-service on Docker Hub
+# (published by .github/workflows/release.yml on push to main / vX.Y.Z tags).
+#
+# SSH goes through Cloudflare Tunnel (see ~/.ssh/config for vps.fikua.com).
+
 set -euo pipefail
 
-IMAGE_NAME="fikua/digital-signature-service"
-IMAGE_TAG="${TAG:-latest}"
-IMAGE_FULL="${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE="fikua/fikua-digital-signature-service:${TAG:-latest}"
+SSH_HOST="vps.fikua.com"
+REMOTE_DIR="/opt/vps/projects/fikua-lab/dss"
 
-# VPS connection (matches dev-tools/ovh convention)
-VPS_IP="51.38.179.236"
-VPS_USER="ubuntu"
-SSH_KEY="${SSH_KEY:-$(cd "$(dirname "$0")/../eudistack-platform-dev/dev-tools/ovh/ssh" 2>/dev/null && pwd)/id_ed25519}"
-SSH_PORT="49222"
-SSH_OPTS="-i ${SSH_KEY} -o StrictHostKeyChecking=no -p ${SSH_PORT}"
+echo "==> Pulling ${IMAGE} on ${SSH_HOST}"
+ssh "${SSH_HOST}" "sudo docker pull ${IMAGE}"
 
-echo "==> Pulling ${IMAGE_FULL} on VPS (${VPS_IP})"
-ssh ${SSH_OPTS} "${VPS_USER}@${VPS_IP}" "sudo docker pull ${IMAGE_FULL}"
+echo "==> Restarting dss"
+ssh "${SSH_HOST}" "cd ${REMOTE_DIR} && sudo docker compose --env-file .env up -d"
 
-echo "==> Restarting mock-qtsp container"
-ssh ${SSH_OPTS} "${VPS_USER}@${VPS_IP}" "cd /opt/vps/eudistack && sudo docker compose --env-file .env -f compose.yaml up -d mock-qtsp"
-
-echo "==> Done. Deployed ${IMAGE_FULL}"
-echo "==> URL: https://mock-qtsp.altia.fikua.com"
+echo "==> Done. URL: https://mock-qtsp.altia.fikua.com"
