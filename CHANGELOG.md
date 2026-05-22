@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-05-22
+
+### Notes
+- Re-tags the production-readiness work that landed via PR #2. v0.3.0 was
+  pushed before the PR merge as a snapshot of the partially-completed
+  feature set; v0.3.1 marks the first published image with the full
+  Actuator + OTEL + OpenAPI + JaCoCo + Sonar baseline.
+- OpenAPI document `info.version` bumped to match.
+
 ## [0.3.0] - 2026-05-22
 
 ### Security

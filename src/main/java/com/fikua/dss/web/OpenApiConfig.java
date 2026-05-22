@@ -38,7 +38,7 @@ public class OpenApiConfig {
                         .title("Fikua Digital Signature Service")
                         .description("Cloud Signature Consortium (CSC) v2 API. Mock QTSP for "
                                 + "development and testing of remote signing flows.")
-                        .version("0.3.0")
+                        .version("0.3.1")
                         .license(new License()
                                 .name("Apache-2.0")
                                 .url("https://www.apache.org/licenses/LICENSE-2.0")))
