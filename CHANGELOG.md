@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-05-22
+
+### Security
+- **Removed embedded e-seal certificate and private key from the image.**
+  Previous versions baked an Altia e-seal cert into `src/main/resources/certs/`
+  and shipped it inside the published Docker image. The Docker Hub repository
+  was wiped and re-created under the new image name; the embedded key is
+  considered compromised and must be rotated wherever it was used.
+
+### Changed
+- **Renamed Docker image** to `fikua/fikua-digital-signature-service` (was
+  `fikua/digital-signature-service`). Repository renamed to match.
+- **Certificate loading is now filesystem-only.** Defaults to
+  `file:/certs/mock-eseal.{crt,key}`; the host must mount its own certs
+  read-only at runtime.
+- `deploy.sh` now goes through Cloudflare Tunnel (`vps.fikua.com`) instead of
+  raw SSH + port 49222.
+- `docker-compose.yml` mounts `./certs:/certs:ro` and points at the new image
+  name + filesystem defaults.
+
+### Added
+- `LICENSE` (Apache-2.0, copyright Fikua) and `NOTICE` file.
+- `.dockerignore` blocking any cert/key material from being baked into images.
+- `.gitignore` hardened with `**/certs/`, `*.pem`, `*.key`, `*.crt`, `*.p12`,
+  `*.pfx`, `*.jks`.
+- README rewritten with mock-cert quick-start and Apache-2.0 license note.
+
 ## [0.1.0] - 2026-04-02
 
 ### Added

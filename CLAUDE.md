@@ -46,12 +46,23 @@ config.
 
 ## Release & deployment
 
-- **Image:** `fikua/digital-signature-service` on Docker Hub (public).
+- **Image:** `fikua/fikua-digital-signature-service` on Docker Hub (public).
+- **Repo:** `github.com/fikua/fikua-digital-signature-service` (public, Apache-2.0).
 - **CI/CD:** `.github/workflows/release.yml` builds and pushes on push to
   `main` (tag `latest`) and on `v*.*.*` tags (semver tags).
-- **VPS:** manual deploy via `deploy.sh` to OVH VPS, endpoint
-  `mock-qtsp.altia.fikua.com` (endpoint name kept for compatibility with
-  existing STG seeds/configs).
+- **VPS:** manual deploy via `deploy.sh` (uses `vps.fikua.com` SSH via
+  Cloudflare Tunnel). Public endpoint `mock-qtsp.altia.fikua.com` (name
+  kept for compatibility with existing STG seeds/configs).
+
+## Certificates — never bake into the image
+
+- The image MUST NOT contain any cert or private key. `src/main/resources/`
+  has no `certs/` folder; `.dockerignore` blocks it defensively.
+- Defaults point at `file:/certs/mock-eseal.{crt,key}`; the host mounts
+  its own `certs/` directory read-only into `/certs/` at runtime.
+- A previous version (≤ 0.2.0) embedded an Altia e-seal key in the JAR —
+  that key has been considered compromised and the Docker Hub repo was
+  wiped and re-created under a new name. Do not regress.
 
 ## Git workflow
 
