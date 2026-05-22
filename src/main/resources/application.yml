@@ -1,6 +1,27 @@
+spring:
+  application:
+    name: fikua-digital-signature-service
+  main:
+    banner-mode: off
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
 server:
   port: ${SERVER_PORT:9090}
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    max-http-form-post-size: 2MB
+    max-swallow-size: 2MB
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
 
+# CSC / Mock QTSP application settings
 dss:
   client-id: ${CLIENT_ID:mock-client}
   client-secret: ${CLIENT_SECRET:mock-secret}
@@ -11,3 +32,80 @@ dss:
     key-path: ${KEY_PATH:file:/certs/mock-eseal.key}
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}
+
+# Actuator: serve probes at root paths and expose health + info publicly.
+management:
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        health: health
+        info: info
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,certificate
+        liveness:
+          include: livenessState
+  info:
+    git:
+      mode: simple
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+info:
+  app:
+    name: ${spring.application.name}
+    description: Fikua Digital Signature Service (CSC v2 mock QTSP)
+
+# OpenAPI / Swagger UI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
+# OpenTelemetry. The OTLP exporter is silent unless OTEL_EXPORTER_OTLP_ENDPOINT
+# is set in the environment.
+otel:
+  service:
+    name: ${spring.application.name}
+  traces:
+    exporter: ${OTEL_TRACES_EXPORTER:none}
+  metrics:
+    exporter: ${OTEL_METRICS_EXPORTER:none}
+  logs:
+    exporter: ${OTEL_LOGS_EXPORTER:none}
+
+logging:
+  level:
+    root: INFO
+    com.fikua.dss: INFO
+    org.springframework: WARN
+    org.springframework.boot.autoconfigure: WARN
+    org.apache.coyote: WARN
+    org.apache.catalina: WARN
+    org.apache.tomcat: WARN
+    io.opentelemetry: WARN
+    io.micrometer: WARN
+    sun.net: WARN
+    org.springdoc: WARN
