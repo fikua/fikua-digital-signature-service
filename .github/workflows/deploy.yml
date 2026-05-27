@@ -26,7 +26,7 @@ jobs:
     # ship to production unsupervised.
     environment:
       name: prd
-      url: https://mock-qtsp.altia.fikua.com/health
+      url: https://dss.fikua.com/health
 
     steps:
       - name: Checkout (for the compose file)
@@ -111,7 +111,7 @@ jobs:
       - name: Wait for /health to report UP
         run: |
           for i in $(seq 1 30); do
-            body=$(ssh vps.fikua.com 'curl -fsS http://127.0.0.1:9090/health' || true)
+            body=$(ssh vps.fikua.com 'sudo docker exec fikua-digital-signature-service wget -qO- http://127.0.0.1:9090/health' || true)
             echo "attempt $i: $body" | head -c 400
             echo
             if echo "$body" | grep -q '"status":"UP"'; then
@@ -126,4 +126,4 @@ jobs:
       - name: Smoke-test through Traefik (Host header)
         run: |
           ssh vps.fikua.com \
-            'curl -sI -H "Host: mock-qtsp.altia.fikua.com" http://127.0.0.1:8081/health | head -5'
+            'curl -sIk -H "Host: dss.fikua.com" https://127.0.0.1/health | head -5'

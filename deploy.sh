@@ -22,4 +22,4 @@ ssh "${SSH_HOST}" "sudo docker pull ${IMAGE}"
 echo "==> Restarting dss"
 ssh "${SSH_HOST}" "cd ${REMOTE_DIR} && sudo docker compose --env-file .env up -d"
 
-echo "==> Done. URL: https://mock-qtsp.altia.fikua.com"
+echo "==> Done. URL: https://dss.fikua.com"
