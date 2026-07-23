@@ -36,10 +36,18 @@ services:
       SAD_TTL: ${DSS_SAD_TTL:-300}
       CERT_PATH: file:/certs/issuer-eseal.crt
       KEY_PATH: file:/certs/issuer-eseal.key
-      # OpenTelemetry exporters stay silent until an OTLP endpoint is set.
-      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-none}
-      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-none}
-      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-none}
+      # otel-collector lives in platform-services/compose.yaml, reachable
+      # over traefik-public (see networks: below). It routes this
+      # service's telemetry to the "fikua-dss" OpenObserve organization
+      # by matching on OTEL_SERVICE_NAME — see platform-services/otel-collector/config.yaml.
+      OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-otlp}
+      OTEL_METRICS_EXPORTER: ${OTEL_METRICS_EXPORTER:-otlp}
+      OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-otlp}
+      # 4318 = OTLP/HTTP (the Java SDK's default protocol is http/protobuf,
+      # not gRPC — pointing this at the gRPC port 4317 connects but resets
+      # the connection on every export because the frames don't parse).
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_SERVICE_NAME: fikua-digital-signature-service
     volumes:
       - ./certs:/certs:ro
     networks:
