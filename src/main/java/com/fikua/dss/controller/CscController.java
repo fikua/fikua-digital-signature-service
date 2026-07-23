@@ -17,6 +17,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.TimeZone;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 @RestController
 @RequestMapping("/csc/v2")
 public class CscController {
@@ -162,6 +164,11 @@ public class CscController {
         }
 
         var signatures = signingService.signHashes(request.hash());
+        log.info("credential.signed",
+                kv("event", "credential.signed"),
+                kv("credential_id", LogSanitizer.clean(request.credentialID())),
+                kv("signature_count", signatures.size()),
+                kv("result", "success"));
         return ResponseEntity.ok(new SignHashResponse(signatures));
     }
 
@@ -194,6 +201,11 @@ public class CscController {
             signedDocs.add(signatures.get(i));
         }
 
+        log.info("credential.signed",
+                kv("event", "credential.signed"),
+                kv("credential_id", LogSanitizer.clean(request.credentialID())),
+                kv("signature_count", signedDocs.size()),
+                kv("result", "success"));
         return ResponseEntity.ok(new SignDocResponse(signedDocs));
     }
 

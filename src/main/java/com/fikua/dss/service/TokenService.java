@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 @Service
 public class TokenService {
 
@@ -31,7 +33,8 @@ public class TokenService {
         var token = UUID.randomUUID().toString();
         var expiry = Instant.now().plusSeconds(properties.tokenTtlSeconds());
         activeTokens.put(token, expiry);
-        log.info("Issued access token, expires at {}", expiry);
+        log.info("Issued access token, expires at {}",
+                expiry, kv("event", "token.authorized"), kv("result", "success"));
         return token;
     }
 
@@ -57,7 +60,10 @@ public class TokenService {
         activeSads.put(sad, new SadEntry(credentialId, expiry));
         if (log.isInfoEnabled()) {
             log.info("Issued SAD for credential {}, expires at {}",
-                    LogSanitizer.clean(credentialId), expiry);
+                    LogSanitizer.clean(credentialId), expiry,
+                    kv("event", "credential.authorized"),
+                    kv("credential_id", credentialId),
+                    kv("result", "success"));
         }
         return sad;
     }
