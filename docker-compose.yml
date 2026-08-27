@@ -21,7 +21,7 @@ services:
       CREDENTIAL_PASSWORD: mock-password
       TOKEN_TTL: 3600
       SAD_TTL: 300
-      CERT_PATH: file:/certs/mock-eseal.crt
+      CERT_PATH: file:/certs/mock-eseal-chain.pem
       KEY_PATH: file:/certs/mock-eseal.key
     volumes:
       - ./certs:/certs:ro
