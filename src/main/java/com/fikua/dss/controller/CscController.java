@@ -1,6 +1,5 @@
 package com.fikua.dss.controller;
 
-import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.dto.*;
 import com.fikua.dss.service.CertificateService;
 import com.fikua.dss.service.SigningService;
@@ -25,18 +24,15 @@ public class CscController {
 
     private static final Logger log = LoggerFactory.getLogger(CscController.class);
 
-    private final DssProperties properties;
     private final TokenService tokenService;
     private final CertificateService certificateService;
     private final SigningService signingService;
 
     public CscController(
-            DssProperties properties,
             TokenService tokenService,
             CertificateService certificateService,
             SigningService signingService
     ) {
-        this.properties = properties;
         this.tokenService = tokenService;
         this.certificateService = certificateService;
         this.signingService = signingService;
@@ -47,11 +43,11 @@ public class CscController {
         log.info("POST /csc/v2/info");
         return ResponseEntity.ok(new CscInfoResponse(
                 "2.0.0.0",
-                "EUDIStack Mock QTSP",
+                "EUDIStack Mock TSP",
                 "",
                 "ES",
                 "en",
-                "Mock QTSP for development and testing. NOT for production use.",
+                "Mock TSP for development and testing. NOT for production use, NOT qualified.",
                 List.of("basic", "oauth2client"),
                 List.of(
                         "info",
@@ -72,10 +68,10 @@ public class CscController {
             @RequestBody(required = false) CredentialsListRequest request
     ) {
         log.info("POST /csc/v2/credentials/list");
-        var error = validateBearer(authHeader);
-        if (error != null) return error;
+        var tenantResult = resolveTenant(authHeader);
+        if (tenantResult.error() != null) return tenantResult.error();
 
-        return ResponseEntity.ok(new CredentialsListResponse(List.of(properties.credentialId())));
+        return ResponseEntity.ok(new CredentialsListResponse(List.of(tenantResult.tenant().tenant().credentialId())));
     }
 
     @PostMapping("/credentials/info")
@@ -87,22 +83,23 @@ public class CscController {
             log.info("POST /csc/v2/credentials/info credentialID={}",
                     LogSanitizer.clean(request.credentialID()));
         }
-        var error = validateBearer(authHeader);
-        if (error != null) return error;
+        var tenantResult = resolveTenant(authHeader);
+        if (tenantResult.error() != null) return tenantResult.error();
+        var tenant = tenantResult.tenant();
 
-        if (!properties.credentialId().equals(request.credentialID())) {
+        if (!tenant.tenant().credentialId().equals(request.credentialID())) {
             return ResponseEntity.badRequest().body(
                     new ErrorResponse("invalid_request", "Unknown credential ID"));
         }
 
-        var cert = certificateService.getCertificateChain().getFirst();
+        var cert = tenant.certificateChain().getFirst();
         var df = new SimpleDateFormat("yyyyMMddHHmmss'Z'");
         df.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         var keyInfo = new CredentialsInfoResponse.KeyInfo(
                 "enabled",
-                List.of(certificateService.getKeyAlgorithmOid()),
-                certificateService.getKeyLength()
+                List.of(tenant.getKeyAlgorithmOid()),
+                tenant.getKeyLength()
         );
 
         var certInfo = new CredentialsInfoResponse.CertInfo(
@@ -112,7 +109,7 @@ public class CscController {
                 cert.getSerialNumber().toString(16),
                 df.format(cert.getNotBefore()),
                 df.format(cert.getNotAfter()),
-                certificateService.getCertificateChainBase64()
+                tenant.certificateChainBase64()
         );
 
         return ResponseEntity.ok(new CredentialsInfoResponse(keyInfo, certInfo));
@@ -127,8 +124,8 @@ public class CscController {
             log.info("POST /csc/v2/credentials/authorize credentialID={} numSignatures={}",
                     LogSanitizer.clean(request.credentialID()), request.numSignatures());
         }
-        var error = validateBearer(authHeader);
-        if (error != null) return error;
+        var tenantResult = resolveTenant(authHeader);
+        if (tenantResult.error() != null) return tenantResult.error();
 
         var password = extractPassword(request.authData());
         if (password == null) {
@@ -137,7 +134,7 @@ public class CscController {
         }
 
         try {
-            var sad = tokenService.issueSad(request.credentialID(), password);
+            var sad = tokenService.issueSad(tenantResult.tenantClientId(), request.credentialID(), password);
             return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad));
         } catch (SecurityException e) {
             return ResponseEntity.status(401).body(
@@ -155,15 +152,15 @@ public class CscController {
                     LogSanitizer.clean(request.credentialID()),
                     request.hash() != null ? request.hash().size() : 0);
         }
-        var error = validateBearer(authHeader);
-        if (error != null) return error;
+        var tenantResult = resolveTenant(authHeader);
+        if (tenantResult.error() != null) return tenantResult.error();
 
-        if (!tokenService.validateSad(request.SAD(), request.credentialID())) {
+        if (!tokenService.validateSad(tenantResult.tenantClientId(), request.SAD(), request.credentialID())) {
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
 
-        var signatures = signingService.signHashes(request.hash());
+        var signatures = signingService.signHashes(request.hash(), tenantResult.tenant());
         log.info("credential.signed",
                 kv("event", "credential.signed"),
                 kv("credential_id", LogSanitizer.clean(request.credentialID())),
@@ -182,10 +179,10 @@ public class CscController {
                     LogSanitizer.clean(request.credentialID()),
                     request.documents() != null ? request.documents().size() : 0);
         }
-        var error = validateBearer(authHeader);
-        if (error != null) return error;
+        var tenantResult = resolveTenant(authHeader);
+        if (tenantResult.error() != null) return tenantResult.error();
 
-        if (!tokenService.validateSad(request.SAD(), request.credentialID())) {
+        if (!tokenService.validateSad(tenantResult.tenantClientId(), request.SAD(), request.credentialID())) {
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
@@ -194,7 +191,7 @@ public class CscController {
                 .map(doc -> Base64.getDecoder().decode(doc.document()))
                 .toList();
 
-        var signatures = signingService.signDocuments(documents);
+        var signatures = signingService.signDocuments(documents, tenantResult.tenant());
 
         var signedDocs = new ArrayList<String>();
         for (int i = 0; i < request.documents().size(); i++) {
@@ -209,17 +206,19 @@ public class CscController {
         return ResponseEntity.ok(new SignDocResponse(signedDocs));
     }
 
-    private ResponseEntity<ErrorResponse> validateBearer(String authHeader) {
+    private TenantResolution resolveTenant(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body(
-                    new ErrorResponse("unauthorized", "Missing Bearer token"));
+            return TenantResolution.error(ResponseEntity.status(401).body(
+                    new ErrorResponse("unauthorized", "Missing Bearer token")));
         }
         var token = authHeader.substring(7);
-        if (!tokenService.validateToken(token)) {
-            return ResponseEntity.status(401).body(
-                    new ErrorResponse("unauthorized", "Invalid or expired access token"));
+        var tenantClientId = tokenService.resolveTenantClientId(token);
+        if (tenantClientId == null) {
+            return TenantResolution.error(ResponseEntity.status(401).body(
+                    new ErrorResponse("unauthorized", "Invalid or expired access token")));
         }
-        return null;
+        var tenant = certificateService.byClientId(tenantClientId);
+        return TenantResolution.ok(tenantClientId, tenant);
     }
 
     private String extractPassword(List<CredentialsAuthorizeRequest.AuthData> authData) {
@@ -229,5 +228,19 @@ public class CscController {
                 .map(CredentialsAuthorizeRequest.AuthData::value)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private record TenantResolution(
+            String tenantClientId,
+            CertificateService.TenantMaterial tenant,
+            ResponseEntity<ErrorResponse> error
+    ) {
+        static TenantResolution ok(String tenantClientId, CertificateService.TenantMaterial tenant) {
+            return new TenantResolution(tenantClientId, tenant, null);
+        }
+
+        static TenantResolution error(ResponseEntity<ErrorResponse> error) {
+            return new TenantResolution(null, null, error);
+        }
     }
 }

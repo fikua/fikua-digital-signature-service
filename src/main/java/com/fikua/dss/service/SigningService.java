@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.security.PrivateKey;
 import java.security.Signature;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -21,36 +22,30 @@ public class SigningService {
             0x00, 0x04, 0x20
     };
 
-    private final CertificateService certificateService;
-
-    public SigningService(CertificateService certificateService) {
-        this.certificateService = certificateService;
-    }
-
-    public List<String> signHashes(List<String> hashesBase64) {
+    public List<String> signHashes(List<String> hashesBase64, CertificateService.TenantMaterial tenant) {
         var signatures = new ArrayList<String>();
         for (var hashB64 : hashesBase64) {
             var hashBytes = Base64.getUrlDecoder().decode(hashB64);
-            var signatureBytes = rawSign(hashBytes);
+            var signatureBytes = rawSign(hashBytes, tenant.privateKey());
             signatures.add(Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes));
         }
         log.info("Signed {} hash(es)", hashesBase64.size());
         return signatures;
     }
 
-    public List<String> signDocuments(List<byte[]> documents) {
+    public List<String> signDocuments(List<byte[]> documents, CertificateService.TenantMaterial tenant) {
         var signatures = new ArrayList<String>();
         for (var doc : documents) {
-            var signatureBytes = signWithDigest(doc);
+            var signatureBytes = signWithDigest(doc, tenant);
             signatures.add(Base64.getEncoder().encodeToString(signatureBytes));
         }
         log.info("Signed {} document(s)", documents.size());
         return signatures;
     }
 
-    private byte[] rawSign(byte[] precomputedHash) {
+    private byte[] rawSign(byte[] precomputedHash, PrivateKey privateKey) {
         try {
-            var algo = certificateService.getPrivateKey().getAlgorithm();
+            var algo = privateKey.getAlgorithm();
             var sigAlgo = switch (algo) {
                 case "EC" -> "NONEwithECDSA";
                 case "RSA" -> "NONEwithRSA";
@@ -69,7 +64,7 @@ public class SigningService {
             }
 
             var sig = Signature.getInstance(sigAlgo, "BC");
-            sig.initSign(certificateService.getPrivateKey());
+            sig.initSign(privateKey);
             sig.update(dataToSign);
             return sig.sign();
         } catch (Exception e) {
@@ -77,11 +72,11 @@ public class SigningService {
         }
     }
 
-    private byte[] signWithDigest(byte[] data) {
+    private byte[] signWithDigest(byte[] data, CertificateService.TenantMaterial tenant) {
         try {
-            var sigAlgo = certificateService.getSignatureAlgorithm();
+            var sigAlgo = tenant.getSignatureAlgorithm();
             var sig = Signature.getInstance(sigAlgo, "BC");
-            sig.initSign(certificateService.getPrivateKey());
+            sig.initSign(tenant.privateKey());
             sig.update(data);
             return sig.sign();
         } catch (Exception e) {

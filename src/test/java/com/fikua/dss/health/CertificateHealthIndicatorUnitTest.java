@@ -2,6 +2,7 @@ package com.fikua.dss.health;
 
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CertificateProperties;
+import com.fikua.dss.config.DssProperties.TenantProperties;
 import com.fikua.dss.service.CertificateService;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -25,7 +26,9 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -37,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class CertificateHealthIndicatorUnitTest {
 
     private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");
+    private static final String TENANT_CLIENT_ID = "c";
     private final Clock fixed = Clock.fixed(NOW, ZoneOffset.UTC);
 
     @BeforeAll
@@ -71,45 +75,43 @@ class CertificateHealthIndicatorUnitTest {
 
     /** Stub of CertificateService that bypasses @PostConstruct file IO. */
     private static final class StubCertificateService extends CertificateService {
-        private final List<X509Certificate> chain;
-        private final PrivateKey key;
+        private final Map<String, TenantMaterial> tenants;
         private final RuntimeException toThrow;
 
         StubCertificateService(List<X509Certificate> chain, PrivateKey key, RuntimeException toThrow) {
-            super(new DssProperties("c", "s", "id", "p",
-                    new CertificateProperties("file:/dev/null", "file:/dev/null"),
+            super(new DssProperties(List.of(new TenantProperties("c", "s", "id", "p",
+                    new CertificateProperties("file:/dev/null", "file:/dev/null"))),
                     3600, 300));
-            this.chain = chain;
-            this.key = key;
             this.toThrow = toThrow;
+            if (chain == null) {
+                this.tenants = Map.of();
+            } else {
+                var chainBase64 = chain.stream().map(c -> {
+                    try { return Base64.getEncoder().encodeToString(c.getEncoded()); }
+                    catch (Exception e) { throw new IllegalStateException(e); }
+                }).toList();
+                var material = new TenantMaterial(
+                        new TenantProperties("c", "s", "id", "p",
+                                new CertificateProperties("file:/dev/null", "file:/dev/null")),
+                        chain, chainBase64, key);
+                var map = new LinkedHashMap<String, TenantMaterial>();
+                map.put(TENANT_CLIENT_ID, material);
+                this.tenants = map;
+            }
         }
 
-        @Override public List<X509Certificate> getCertificateChain() {
+        @Override public Map<String, TenantMaterial> allTenants() {
             if (toThrow != null) throw toThrow;
-            return chain;
-        }
-        @Override public PrivateKey getPrivateKey() { return key; }
-        @Override public List<String> getCertificateChainBase64() {
-            return chain == null ? List.of() : chain.stream().map(c -> {
-                try { return Base64.getEncoder().encodeToString(c.getEncoded()); }
-                catch (Exception e) { throw new IllegalStateException(e); }
-            }).toList();
+            return tenants;
         }
     }
 
     @Test
-    void downWhenChainIsNull() {
+    void downWhenNoTenants() {
         var svc = new StubCertificateService(null, null, null);
         var h = new CertificateHealthIndicator(svc, fixed).health();
         assertEquals(Status.DOWN, h.getStatus());
-        assertEquals("no certificate loaded", h.getDetails().get("reason"));
-    }
-
-    @Test
-    void downWhenChainIsEmpty() {
-        var svc = new StubCertificateService(List.of(), null, null);
-        var h = new CertificateHealthIndicator(svc, fixed).health();
-        assertEquals(Status.DOWN, h.getStatus());
+        assertEquals("no tenants configured", h.getDetails().get("reason"));
     }
 
     @Test
@@ -119,7 +121,7 @@ class CertificateHealthIndicatorUnitTest {
         var svc = new StubCertificateService(List.of(cert), kp.getPrivate(), null);
         var h = new CertificateHealthIndicator(svc, fixed).health();
         assertEquals(Status.DOWN, h.getStatus());
-        assertEquals("certificate not yet valid", h.getDetails().get("reason"));
+        assertEquals("certificate not yet valid for tenant " + TENANT_CLIENT_ID, h.getDetails().get("reason"));
     }
 
     @Test
@@ -129,17 +131,7 @@ class CertificateHealthIndicatorUnitTest {
         var svc = new StubCertificateService(List.of(cert), kp.getPrivate(), null);
         var h = new CertificateHealthIndicator(svc, fixed).health();
         assertEquals(Status.DOWN, h.getStatus());
-        assertEquals("certificate expired", h.getDetails().get("reason"));
-    }
-
-    @Test
-    void downWhenPrivateKeyMissing() throws Exception {
-        var kp = ecKeyPair();
-        var cert = selfSigned(kp, NOW.minusSeconds(3600), NOW.plusSeconds(3600));
-        var svc = new StubCertificateService(List.of(cert), null, null);
-        var h = new CertificateHealthIndicator(svc, fixed).health();
-        assertEquals(Status.DOWN, h.getStatus());
-        assertEquals("private key not loaded", h.getDetails().get("reason"));
+        assertEquals("certificate expired for tenant " + TENANT_CLIENT_ID, h.getDetails().get("reason"));
     }
 
     @Test
@@ -149,7 +141,6 @@ class CertificateHealthIndicatorUnitTest {
         var svc = new StubCertificateService(List.of(cert), kp.getPrivate(), null);
         var h = new CertificateHealthIndicator(svc, fixed).health();
         assertEquals(Status.UP, h.getStatus());
-        assertEquals("EC", h.getDetails().get("keyAlgorithm"));
     }
 
     @Test

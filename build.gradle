@@ -34,8 +34,14 @@ abstract class GenerateTestCerts extends DefaultTask {
     void run() {
         def outDir = outputDir.get().asFile
         outDir.mkdirs()
-        def crt = new File(outDir, 'mock-eseal.crt')
-        def key = new File(outDir, 'mock-eseal.key')
+        generate(outDir, 'mock-eseal', '/C=ES/O=Fikua/CN=Fikua Test e-Seal')
+        // Second tenant's cert, used by multi-tenant isolation tests.
+        generate(outDir, 'tenant-b-eseal', '/C=ES/O=Tenant B/CN=Tenant B Test e-Seal')
+    }
+
+    private void generate(File outDir, String basename, String subject) {
+        def crt = new File(outDir, "${basename}.crt")
+        def key = new File(outDir, "${basename}.key")
         if (crt.exists() && key.exists()) {
             return
         }
@@ -46,7 +52,7 @@ abstract class GenerateTestCerts extends DefaultTask {
                     '-keyout', key.absolutePath,
                     '-out', crt.absolutePath,
                     '-sha256', '-days', '3650', '-nodes',
-                    '-subj', '/C=ES/O=Fikua/CN=Fikua Test e-Seal'
+                    '-subj', subject
         }
     }
 }

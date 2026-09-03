@@ -1,9 +1,13 @@
 # Fikua Digital Signature Service
 
-Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0](https://cloudsignatureconsortium.org/resources/). Initial mode is a **mock Qualified Trust Service Provider (QTSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. The roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
+Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0](https://cloudsignatureconsortium.org/resources/). Initial mode is a **mock Trust Service Provider (TSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. The roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
 
 > [!WARNING]
-> **Mock mode is for development and testing only.** It accepts a static client secret and signs with a self-signed certificate. **Never deploy this as a real QTSP** and never feed it a production e-seal certificate.
+> **Mock mode is for development and testing only.** It accepts static client secrets and signs with test certificates. **Never deploy this as a real (qualified) TSP** and never feed it a production e-seal certificate.
+
+## Multi-tenant
+
+The service can serve several CSC clients ("tenants") at once, each with its own OAuth2 `client_id`/`client_secret`, CSC `credentialId`, and signing certificate. A tenant's access token can only ever list, inspect, authorize, or sign with **its own** certificate — the token carries the tenant it was minted for, and every subsequent call is resolved from that token, not from client-supplied identifiers. See `MultiTenantIsolationTest` for the enforced isolation guarantees.
 
 ## Endpoints
 
@@ -34,17 +38,32 @@ Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0]
 
 All settings via environment variables. The container does **not** ship with any certificate inside — you must mount your own at `/certs/`.
 
+Tenant 0 (the default/first tenant) is configured via the flat variables below, kept for backward compatibility:
+
 | Variable              | Default                      | Description                       |
-| --------------------- | ---------------------------- | --------------------------------- |
+| --------------------- | ----------------------------- | --------------------------------- |
 | `SERVER_PORT`         | `9090`                       | HTTP port                         |
-| `CLIENT_ID`           | `mock-client`                | OAuth2 client ID                  |
-| `CLIENT_SECRET`       | `mock-secret`                | OAuth2 client secret              |
-| `CREDENTIAL_ID`       | `mock-credential-001`        | CSC credential identifier         |
-| `CREDENTIAL_PASSWORD` | `mock-password`              | Credential authorization password |
-| `CERT_PATH`           | `file:/certs/mock-eseal.crt` | X.509 certificate (PEM)           |
-| `KEY_PATH`            | `file:/certs/mock-eseal.key` | Private key (PKCS#8 PEM)          |
-| `TOKEN_TTL`           | `3600`                       | Access token lifetime (seconds)   |
-| `SAD_TTL`             | `300`                        | SAD lifetime (seconds)            |
+| `CLIENT_ID`           | `mock-client`                | OAuth2 client ID (tenant 0)       |
+| `CLIENT_SECRET`       | `mock-secret`                | OAuth2 client secret (tenant 0)   |
+| `CREDENTIAL_ID`       | `mock-credential-001`        | CSC credential identifier (tenant 0) |
+| `CREDENTIAL_PASSWORD` | `mock-password`              | Credential authorization password (tenant 0) |
+| `CERT_PATH`           | `file:/certs/mock-eseal.crt` | X.509 certificate, PEM (tenant 0) |
+| `KEY_PATH`            | `file:/certs/mock-eseal.key` | Private key, PKCS#8 PEM (tenant 0) |
+| `TOKEN_TTL`           | `3600`                       | Access token lifetime (seconds), applies to all tenants |
+| `SAD_TTL`             | `300`                        | SAD lifetime (seconds), applies to all tenants |
+
+Additional tenants are added via indexed `DSS_TENANTS_<n>_*` variables (Spring binds indexed env vars onto the `dss.tenants` list), or `DSS_TENANTS_0_*` to override tenant 0 explicitly instead of the flat aliases above:
+
+```bash
+DSS_TENANTS_1_CLIENT_ID=fikua-issuer
+DSS_TENANTS_1_CLIENT_SECRET=<secret>
+DSS_TENANTS_1_CREDENTIAL_ID=fikua-credential-001
+DSS_TENANTS_1_CREDENTIAL_PASSWORD=<password>
+DSS_TENANTS_1_CERTIFICATE_CERT_PATH=file:/certs/fikua/fikua-eseal-chain.pem
+DSS_TENANTS_1_CERTIFICATE_KEY_PATH=file:/certs/fikua/fikua-eseal.key
+```
+
+Every tenant's certificate + key must be mounted read-only into the container; the image never bakes in any cert material (see [Certificates — never bake into the image](CLAUDE.md)). Secrets (`*_CLIENT_SECRET`, `*_CREDENTIAL_PASSWORD`) are only ever supplied via environment variables backed by a gitignored `.env` file (or the platform's secret store) — never hardcoded in source or compose defaults.
 
 ## Quick start
 
@@ -153,7 +172,7 @@ Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive 
 
 ## Contributing
 
-Conventional Commits, squash-merge to `main`. PRs welcome — please keep mock-mode and (future) real-QTSP paths cleanly separated.
+Conventional Commits, squash-merge to `main`. PRs welcome — please keep mock-mode and (future) real-TSP paths cleanly separated.
 
 ## License
 

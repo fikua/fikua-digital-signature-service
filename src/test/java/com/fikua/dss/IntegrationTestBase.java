@@ -13,8 +13,12 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-        "dss.certificate.cert-path=file:build/test-certs/mock-eseal.crt",
-        "dss.certificate.key-path=file:build/test-certs/mock-eseal.key",
+        "dss.tenants[0].client-id=mock-client",
+        "dss.tenants[0].client-secret=mock-secret",
+        "dss.tenants[0].credential-id=mock-credential-001",
+        "dss.tenants[0].credential-password=mock-password",
+        "dss.tenants[0].certificate.cert-path=file:build/test-certs/mock-eseal.crt",
+        "dss.tenants[0].certificate.key-path=file:build/test-certs/mock-eseal.key",
         "dss.token-ttl-seconds=3600",
         "dss.sad-ttl-seconds=300"
 })

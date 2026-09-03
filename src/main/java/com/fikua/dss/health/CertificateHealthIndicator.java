@@ -10,9 +10,9 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * Exposes the signing cert + private key as an Actuator health component
- * under /health → components.certificate. Returns DOWN when the cert is not
- * yet valid, has expired, or the private key failed to load.
+ * Exposes each tenant's signing cert + private key as an Actuator health
+ * component under /health → components.certificate. Returns DOWN as soon as
+ * any tenant's cert is not yet valid, has expired, or failed to load its key.
  */
 @Component("certificate")
 public class CertificateHealthIndicator implements HealthIndicator {
@@ -35,38 +35,37 @@ public class CertificateHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            var chain = certificateService.getCertificateChain();
-            if (chain == null || chain.isEmpty()) {
-                return Health.down().withDetail(REASON_KEY, "no certificate loaded").build();
+            var tenants = certificateService.allTenants();
+            if (tenants.isEmpty()) {
+                return Health.down().withDetail(REASON_KEY, "no tenants configured").build();
             }
-            var cert = chain.getFirst();
-            var now = Instant.now(clock);
-            var notBefore = cert.getNotBefore().toInstant();
-            var notAfter = cert.getNotAfter().toInstant();
-            var keyAlgo = certificateService.getPrivateKey() == null
-                    ? null
-                    : certificateService.getPrivateKey().getAlgorithm();
 
-            if (now.isBefore(notBefore)) {
-                return Health.down()
-                        .withDetail(REASON_KEY, "certificate not yet valid")
-                        .withDetail("validFrom", notBefore.toString())
-                        .build();
+            var now = Instant.now(clock);
+            var builder = Health.up();
+            for (var entry : tenants.entrySet()) {
+                var clientId = entry.getKey();
+                var material = entry.getValue();
+                var cert = material.certificateChain().getFirst();
+                var notBefore = cert.getNotBefore().toInstant();
+                var notAfter = cert.getNotAfter().toInstant();
+
+                if (now.isBefore(notBefore)) {
+                    return Health.down()
+                            .withDetail(REASON_KEY, "certificate not yet valid for tenant " + clientId)
+                            .withDetail("validFrom", notBefore.toString())
+                            .build();
+                }
+                if (now.isAfter(notAfter)) {
+                    return Health.down()
+                            .withDetail(REASON_KEY, "certificate expired for tenant " + clientId)
+                            .withDetail("validTo", notAfter.toString())
+                            .build();
+                }
+                builder.withDetail(clientId, cert.getSubjectX500Principal().getName()
+                        + " (valid to " + notAfter + ")");
+                builder.withDetail(clientId + ".keyAlgorithm", material.privateKey().getAlgorithm());
             }
-            if (now.isAfter(notAfter)) {
-                return Health.down()
-                        .withDetail(REASON_KEY, "certificate expired")
-                        .withDetail("validTo", notAfter.toString())
-                        .build();
-            }
-            if (keyAlgo == null) {
-                return Health.down().withDetail(REASON_KEY, "private key not loaded").build();
-            }
-            return Health.up()
-                    .withDetail("subject", cert.getSubjectX500Principal().getName())
-                    .withDetail("validTo", notAfter.toString())
-                    .withDetail("keyAlgorithm", keyAlgo)
-                    .build();
+            return builder.build();
         } catch (Exception e) {
             return Health.down(e).build();
         }

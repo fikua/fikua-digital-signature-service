@@ -36,7 +36,7 @@ class CscControllerTest extends IntegrationTestBase {
     }
 
     private String issueSad() {
-        return tokenService.issueSad("mock-credential-001", "mock-password");
+        return tokenService.issueSad("mock-client", "mock-credential-001", "mock-password");
     }
 
     private static String sha256Base64Url(byte[] data) throws Exception {

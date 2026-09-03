@@ -19,7 +19,9 @@ import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class CertificateService {
@@ -28,9 +30,8 @@ public class CertificateService {
 
     private final DssProperties properties;
     private final ResourceLoader resourceLoader = new DefaultResourceLoader();
-    private PrivateKey privateKey;
-    private List<X509Certificate> certificateChain;
-    private List<String> certificateChainBase64;
+    private final Map<String, TenantMaterial> tenantsByClientId = new LinkedHashMap<>();
+    private final Map<String, TenantMaterial> tenantsByCredentialId = new LinkedHashMap<>();
 
     public CertificateService(DssProperties properties) {
         this.properties = properties;
@@ -39,17 +40,39 @@ public class CertificateService {
     @PostConstruct
     public void init() {
         Security.addProvider(new BouncyCastleProvider());
-        loadCertificate();
-        loadPrivateKey();
-        log.info("Certificate loaded: subject={}, issuer={}, algo={}",
-                certificateChain.getFirst().getSubjectX500Principal(),
-                certificateChain.getFirst().getIssuerX500Principal(),
-                privateKey.getAlgorithm());
+        if (properties.tenants() == null || properties.tenants().isEmpty()) {
+            throw new IllegalStateException("No tenants configured under dss.tenants");
+        }
+        for (var tenant : properties.tenants()) {
+            var certChain = loadCertificate(tenant.certificate().certPath());
+            var privateKey = loadPrivateKey(tenant.certificate().keyPath(), certChain);
+            var material = new TenantMaterial(tenant, certChain, toBase64(certChain), privateKey);
+
+            if (tenantsByClientId.putIfAbsent(tenant.clientId(), material) != null) {
+                throw new IllegalStateException("Duplicate tenant client-id: " + tenant.clientId());
+            }
+            if (tenantsByCredentialId.putIfAbsent(tenant.credentialId(), material) != null) {
+                throw new IllegalStateException("Duplicate tenant credential-id: " + tenant.credentialId());
+            }
+            log.info("Certificate loaded for tenant clientId={}: subject={}, issuer={}, algo={}",
+                    tenant.clientId(),
+                    certChain.getFirst().getSubjectX500Principal(),
+                    certChain.getFirst().getIssuerX500Principal(),
+                    privateKey.getAlgorithm());
+        }
     }
 
-    public PrivateKey getPrivateKey() { return privateKey; }
-    public List<X509Certificate> getCertificateChain() { return certificateChain; }
-    public List<String> getCertificateChainBase64() { return certificateChainBase64; }
+    public TenantMaterial byClientId(String clientId) {
+        return tenantsByClientId.get(clientId);
+    }
+
+    public TenantMaterial byCredentialId(String credentialId) {
+        return tenantsByCredentialId.get(credentialId);
+    }
+
+    public Map<String, TenantMaterial> allTenants() {
+        return tenantsByClientId;
+    }
 
     private InputStream openResource(String path) {
         try {
@@ -60,11 +83,10 @@ public class CertificateService {
         }
     }
 
-    private void loadCertificate() {
-        var certPath = properties.certificate().certPath();
+    private List<X509Certificate> loadCertificate(String certPath) {
         try (var certInputStream = openResource(certPath)) {
             var certFactory = CertificateFactory.getInstance("X.509");
-            certificateChain = new ArrayList<>();
+            List<X509Certificate> certificateChain = new ArrayList<>();
             var certs = certFactory.generateCertificates(certInputStream);
             for (var cert : certs) {
                 certificateChain.add((X509Certificate) cert);
@@ -72,22 +94,25 @@ public class CertificateService {
             if (certificateChain.isEmpty()) {
                 throw new IllegalStateException("No certificates found in " + certPath);
             }
-            certificateChainBase64 = certificateChain.stream()
-                    .map(cert -> {
-                        try {
-                            return Base64.getEncoder().encodeToString(cert.getEncoded());
-                        } catch (Exception e) {
-                            throw new IllegalStateException("Failed to encode certificate", e);
-                        }
-                    })
-                    .toList();
+            return certificateChain;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load certificate from " + certPath, e);
         }
     }
 
-    private void loadPrivateKey() {
-        var keyPath = properties.certificate().keyPath();
+    private List<String> toBase64(List<X509Certificate> certificateChain) {
+        return certificateChain.stream()
+                .map(cert -> {
+                    try {
+                        return Base64.getEncoder().encodeToString(cert.getEncoded());
+                    } catch (Exception e) {
+                        throw new IllegalStateException("Failed to encode certificate", e);
+                    }
+                })
+                .toList();
+    }
+
+    private PrivateKey loadPrivateKey(String keyPath, List<X509Certificate> certificateChain) {
         try (var keyInputStream = openResource(keyPath)) {
             var keyPem = new String(keyInputStream.readAllBytes(), StandardCharsets.UTF_8);
             var keyBase64 = keyPem
@@ -102,36 +127,43 @@ public class CertificateService {
             var keySpec = new PKCS8EncodedKeySpec(keyBytes);
             var pubKeyAlgo = certificateChain.getFirst().getPublicKey().getAlgorithm();
             var keyFactory = KeyFactory.getInstance(pubKeyAlgo, "BC");
-            privateKey = keyFactory.generatePrivate(keySpec);
+            return keyFactory.generatePrivate(keySpec);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load private key from " + keyPath, e);
         }
     }
 
-    public String getKeyAlgorithmOid() {
-        var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
-        return switch (algo) {
-            case "EC" -> "1.2.840.10045.4.3.2";
-            case "RSA" -> "1.2.840.113549.1.1.11";
-            default -> throw new IllegalStateException("Unsupported key algorithm: " + algo);
-        };
-    }
+    public record TenantMaterial(
+            DssProperties.TenantProperties tenant,
+            List<X509Certificate> certificateChain,
+            List<String> certificateChainBase64,
+            PrivateKey privateKey
+    ) {
+        public String getKeyAlgorithmOid() {
+            var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
+            return switch (algo) {
+                case "EC" -> "1.2.840.10045.4.3.2";
+                case "RSA" -> "1.2.840.113549.1.1.11";
+                default -> throw new IllegalStateException("Unsupported key algorithm: " + algo);
+            };
+        }
 
-    public int getKeyLength() {
-        var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
-        return switch (algo) {
-            case "EC" -> 256;
-            case "RSA" -> 2048;
-            default -> 256;
-        };
-    }
+        public int getKeyLength() {
+            var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
+            return switch (algo) {
+                case "EC" -> 256;
+                case "RSA" -> 2048;
+                default -> 256;
+            };
+        }
 
-    public String getSignatureAlgorithm() {
-        var algo = privateKey.getAlgorithm();
-        return switch (algo) {
-            case "EC" -> "SHA256withECDSA";
-            case "RSA" -> "SHA256withRSA";
-            default -> throw new IllegalStateException("Unsupported algorithm: " + algo);
-        };
+        public String getSignatureAlgorithm() {
+            var algo = privateKey.getAlgorithm();
+            return switch (algo) {
+                case "EC" -> "SHA256withECDSA";
+                case "RSA" -> "SHA256withRSA";
+                default -> throw new IllegalStateException("Unsupported algorithm: " + algo);
+            };
+        }
     }
 }

@@ -24,7 +24,7 @@ class CertificateHealthIndicatorTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.components.certificate.status").value("UP"))
-                .andExpect(jsonPath("$.components.certificate.details.keyAlgorithm").exists());
+                .andExpect(jsonPath("$.components.certificate.details['mock-client.keyAlgorithm']").exists());
     }
 
     @Test

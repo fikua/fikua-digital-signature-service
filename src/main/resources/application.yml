@@ -21,15 +21,20 @@ server:
     include-stacktrace: never
     include-binding-errors: never
 
-# CSC / Mock QTSP application settings
+# CSC / Mock TSP application settings.
+# Each tenant is a separate CSC client (its own OAuth2 client-id/secret,
+# CSC credential-id, and signing certificate). Configure additional tenants
+# by adding DSS_TENANTS_1_*, DSS_TENANTS_2_*, ... env vars (Spring binds
+# indexed env vars onto this list).
 dss:
-  client-id: ${CLIENT_ID:mock-client}
-  client-secret: ${CLIENT_SECRET:mock-secret}
-  credential-id: ${CREDENTIAL_ID:mock-credential-001}
-  credential-password: ${CREDENTIAL_PASSWORD:mock-password}
-  certificate:
-    cert-path: ${CERT_PATH:file:/certs/mock-eseal-chain.pem}
-    key-path: ${KEY_PATH:file:/certs/mock-eseal.key}
+  tenants:
+    - client-id: ${DSS_TENANTS_0_CLIENT_ID:${CLIENT_ID:mock-client}}
+      client-secret: ${DSS_TENANTS_0_CLIENT_SECRET:${CLIENT_SECRET:mock-secret}}
+      credential-id: ${DSS_TENANTS_0_CREDENTIAL_ID:${CREDENTIAL_ID:mock-credential-001}}
+      credential-password: ${DSS_TENANTS_0_CREDENTIAL_PASSWORD:${CREDENTIAL_PASSWORD:mock-password}}
+      certificate:
+        cert-path: ${DSS_TENANTS_0_CERT_PATH:${CERT_PATH:file:/certs/mock-eseal-chain.pem}}
+        key-path: ${DSS_TENANTS_0_KEY_PATH:${KEY_PATH:file:/certs/mock-eseal.key}}
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}
 
