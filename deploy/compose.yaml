@@ -12,9 +12,22 @@
 #
 # Certificates are mounted from the host. The published image does NOT
 # embed certs in the JAR (intentional: certs should never ship inside a
-# public image). The cert + key live at:
-#   /opt/vps/projects/fikua-lab/dss/certs/issuer-eseal.{crt,key}
-# and are mounted read-only into the container.
+# public image). The service is multi-tenant: each CSC client (tenant) has
+# its own OAuth2 client-id/secret, credential-id, and signing cert, kept in
+# its own subfolder under certs/:
+#   /opt/vps/projects/fikua-lab/dss/certs/altia/altia-eseal.{crt,key}      (tenant 0)
+#   /opt/vps/projects/fikua-lab/dss/certs/fikua/fikua-eseal.{crt,key}     (tenant 1)
+#   /opt/vps/projects/fikua-lab/dss/certs/verifier/fikua-verifier.{crt,key} (tenant 2)
+# all mounted read-only into the container. All three leaves are issued
+# under the same fikua-dss mock TSP root CA — see
+# fikua-digital-signature-service/CLAUDE.md ("Certificates"): "Never issue
+# a new tenant leaf under a different/self-signed CA." Tenant 2 signs
+# fikua-lab-idp's OID4VP Authorization Requests (JAR) — a deliberately
+# different trust role from tenant 1's credential-issuance signing (this
+# key represents the Relying Party's identity to wallets, the role a real
+# Wallet-Relying-Party Access Certificate will occupy under CIR (EU)
+# 2025/848 once Fikua registers as an RP) — but the same shared mock root
+# for now, since this DSS has no separate RP-access CA hierarchy yet.
 #
 # Source of truth for this file:
 #   fikua-platform-iac/projects/fikua-lab/dss/compose.yaml
@@ -28,14 +41,30 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: 9090
-      CLIENT_ID: ${DSS_CLIENT_ID:-mock-client}
-      CLIENT_SECRET: ${DSS_CLIENT_SECRET:-mock-secret}
-      CREDENTIAL_ID: ${DSS_CREDENTIAL_ID:-mock-credential-001}
-      CREDENTIAL_PASSWORD: ${DSS_CREDENTIAL_PASSWORD:-mock-password}
+      # Tenant 0 — Altia (pre-existing client, unchanged client-id/secret so
+      # its current integration keeps working without reconfiguration).
+      DSS_TENANTS_0_CLIENT_ID: ${DSS_TENANTS_0_CLIENT_ID:-mock-client}
+      DSS_TENANTS_0_CLIENT_SECRET: ${DSS_TENANTS_0_CLIENT_SECRET:-mock-secret}
+      DSS_TENANTS_0_CREDENTIAL_ID: ${DSS_TENANTS_0_CREDENTIAL_ID:-mock-credential-001}
+      DSS_TENANTS_0_CREDENTIAL_PASSWORD: ${DSS_TENANTS_0_CREDENTIAL_PASSWORD:-mock-password}
+      DSS_TENANTS_0_CERTIFICATE_CERT_PATH: file:/certs/altia/altia-eseal-chain.pem
+      DSS_TENANTS_0_CERTIFICATE_KEY_PATH: file:/certs/altia/altia-eseal.key
+      # Tenant 1 — Fikua (fikua-lab-issuer).
+      DSS_TENANTS_1_CLIENT_ID: ${DSS_TENANTS_1_CLIENT_ID:-fikua-issuer}
+      DSS_TENANTS_1_CLIENT_SECRET: ${DSS_TENANTS_1_CLIENT_SECRET:?DSS_TENANTS_1_CLIENT_SECRET must be set in .env}
+      DSS_TENANTS_1_CREDENTIAL_ID: ${DSS_TENANTS_1_CREDENTIAL_ID:-fikua-credential-001}
+      DSS_TENANTS_1_CREDENTIAL_PASSWORD: ${DSS_TENANTS_1_CREDENTIAL_PASSWORD:?DSS_TENANTS_1_CREDENTIAL_PASSWORD must be set in .env}
+      DSS_TENANTS_1_CERTIFICATE_CERT_PATH: file:/certs/fikua/fikua-eseal-chain.pem
+      DSS_TENANTS_1_CERTIFICATE_KEY_PATH: file:/certs/fikua/fikua-eseal.key
+      # Tenant 2 — Fikua (fikua-lab-idp's OID4VP Verifier).
+      DSS_TENANTS_2_CLIENT_ID: ${DSS_TENANTS_2_CLIENT_ID:-fikua-verifier}
+      DSS_TENANTS_2_CLIENT_SECRET: ${DSS_TENANTS_2_CLIENT_SECRET:?DSS_TENANTS_2_CLIENT_SECRET must be set in .env}
+      DSS_TENANTS_2_CREDENTIAL_ID: ${DSS_TENANTS_2_CREDENTIAL_ID:-fikua-verifier-001}
+      DSS_TENANTS_2_CREDENTIAL_PASSWORD: ${DSS_TENANTS_2_CREDENTIAL_PASSWORD:?DSS_TENANTS_2_CREDENTIAL_PASSWORD must be set in .env}
+      DSS_TENANTS_2_CERTIFICATE_CERT_PATH: file:/certs/verifier/fikua-verifier-chain.pem
+      DSS_TENANTS_2_CERTIFICATE_KEY_PATH: file:/certs/verifier/fikua-verifier.key
       TOKEN_TTL: ${DSS_TOKEN_TTL:-3600}
       SAD_TTL: ${DSS_SAD_TTL:-300}
-      CERT_PATH: file:/certs/issuer-eseal.crt
-      KEY_PATH: file:/certs/issuer-eseal.key
       # otel-collector lives in platform-services/compose.yaml, reachable
       # over traefik-public (see networks: below). It routes this
       # service's telemetry to the "fikua-dss" OpenObserve organization
