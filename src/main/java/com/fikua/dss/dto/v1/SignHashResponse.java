@@ -1,4 +1,4 @@
-package com.fikua.dss.dto;
+package com.fikua.dss.dto.v1;
 
 import java.util.List;
 

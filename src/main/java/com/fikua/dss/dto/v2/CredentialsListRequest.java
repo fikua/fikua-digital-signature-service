@@ -1,4 +1,4 @@
-package com.fikua.dss.dto;
+package com.fikua.dss.dto.v2;
 
 public record CredentialsListRequest(
         String userID,
@@ -6,5 +6,7 @@ public record CredentialsListRequest(
         String certificates,
         Boolean certInfo,
         Boolean authInfo,
-        Boolean onlyValid
+        Boolean onlyValid,
+        String lang,
+        String clientData
 ) {}

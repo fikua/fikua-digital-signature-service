@@ -1,4 +1,4 @@
-package com.fikua.dss.dto;
+package com.fikua.dss.dto.common;
 
 public record TokenRequest(
         String grant_type,

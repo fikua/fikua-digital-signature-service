@@ -1,4 +1,4 @@
-package com.fikua.dss.dto;
+package com.fikua.dss.dto.common;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

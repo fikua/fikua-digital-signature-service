@@ -1,6 +1,6 @@
 # Fikua Digital Signature Service
 
-Spring Boot service implementing the [Cloud Signature Consortium (CSC) API v2.0](https://cloudsignatureconsortium.org/resources/). Initial mode is a **mock Trust Service Provider (TSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. The roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
+Spring Boot service implementing the [Cloud Signature Consortium (CSC) API](https://cloudsignatureconsortium.org/resources/), exposing both **CSC v1 (1.0.3.0)** and **CSC v2 (2.1.0.1)** as strict, version-conformant surfaces in parallel (`/csc/v1/...` and `/csc/v2/...`). Initial mode is a **mock Trust Service Provider (TSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. The roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
 
 > [!WARNING]
 > **Mock mode is for development and testing only.** It accepts static client secrets and signs with test certificates. **Never deploy this as a real (qualified) TSP** and never feed it a production e-seal certificate.
@@ -11,17 +11,45 @@ The service can serve several CSC clients ("tenants") at once, each with its own
 
 ## Endpoints
 
-### CSC v2 API
+Both CSC versions are exposed side-by-side; pick the path prefix that matches your client's CSC version.
+
+### CSC v1 API (1.0.3.0)
 
 | Method | Path                            | Description                                |
 | ------ | ------------------------------- | ------------------------------------------ |
-| POST   | `/oauth2/token`                 | OAuth2 `client_credentials` token endpoint |
-| POST   | `/csc/v2/info`                  | Service information                        |
+| POST   | `/oauth2/token`                 | OAuth2 `client_credentials` token endpoint (shared) |
+| GET    | `/csc/v1/info?lang=`            | Service information (GET in v1)            |
+| POST   | `/csc/v1/credentials/list`      | List available credentials                 |
+| POST   | `/csc/v1/credentials/info`      | Credential and certificate info (`authMode`/`PIN`/`OTP`/`multisign`/`lang`) |
+| POST   | `/csc/v1/credentials/authorize` | Get SAD using `PIN` + `OTP` strings        |
+| POST   | `/csc/v1/signatures/signHash`   | Sign pre-computed hash(es) (`hash` + `hashAlgo`) |
+
+v1 has no `signDoc` endpoint — it is not defined by the 1.0.3.0 spec.
+
+### CSC v2 API (2.1.0.1)
+
+| Method | Path                            | Description                                |
+| ------ | ------------------------------- | ------------------------------------------ |
+| POST   | `/oauth2/token`                 | OAuth2 `client_credentials` token endpoint (shared) |
+| POST   | `/csc/v2/info`                  | Service information (POST in v2)           |
 | POST   | `/csc/v2/credentials/list`      | List available credentials                 |
-| POST   | `/csc/v2/credentials/info`      | Credential and certificate info            |
-| POST   | `/csc/v2/credentials/authorize` | Get SAD (Signature Activation Data)        |
-| POST   | `/csc/v2/signatures/signHash`   | Sign pre-computed hash(es)                 |
-| POST   | `/csc/v2/signatures/signDoc`    | Sign document(s)                           |
+| POST   | `/csc/v2/credentials/info`      | Credential and certificate info (`auth` object) |
+| POST   | `/csc/v2/credentials/authorize` | Get SAD using `authData: [{id, value}]` array |
+| POST   | `/csc/v2/signatures/signHash`   | Sign pre-computed hash(es) (`hashes` + `hashAlgorithmOID`) |
+| POST   | `/csc/v2/signatures/signDoc`    | Sign document(s) — v2 only                 |
+
+### CSC v1 vs v2 contract divergences
+
+| Concern                                    | v1 (1.0.3.0)                                      | v2 (2.1.0.1)                                  |
+| ------------------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| `signatures/signHash` hash field            | `hash: List<String>`                              | `hashes: List<String>`                        |
+| `signatures/signHash` algorithm OID field   | `hashAlgo: String`                                | `hashAlgorithmOID: String`                    |
+| `credentials/authorize` auth secret         | `PIN: String` + `OTP: String`                     | `authData: [{id, value}]` array               |
+| `credentials/info` response auth model      | `authMode` + `PIN` + `OTP` + `multisign` + `lang` | `auth: {mode, expression, objects[]}` object  |
+| `info` HTTP method                          | `GET ?lang=`                                      | `POST` body                                   |
+| `signatures/signDoc` endpoint               | Not defined                                       | Defined (supports `documents` or `documentDigests`) |
+
+The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.json`](csc_openapi_1.0.3.0.json) and [`csc_openapi_2.1.0.1.yaml`](csc_openapi_2.1.0.1.yaml). The published v2.1.0.1 spec has internal inconsistencies between `required` lists and `properties` blocks (e.g. `input-signatures-signhash.required` lists `hash` but `properties` only defines `hashes`); this implementation follows `properties` consistently. See [`TD-ISSUER-CSC-V2-CONFORMANCE.md`](TD-ISSUER-CSC-V2-CONFORMANCE.md) for the Issuer-side migration plan to conformant v1/v2 request bodies.
 
 ### Observability and operations
 

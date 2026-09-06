@@ -1,4 +1,4 @@
-package com.fikua.dss.dto;
+package com.fikua.dss.dto.v1;
 
 import java.util.List;
 
@@ -7,5 +7,7 @@ public record SignHashRequest(
         String SAD,
         List<String> hash,
         String hashAlgo,
-        String signAlgo
+        String signAlgo,
+        String signAlgoParams,
+        String clientData
 ) {}

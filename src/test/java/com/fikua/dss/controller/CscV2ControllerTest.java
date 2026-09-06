@@ -2,13 +2,13 @@ package com.fikua.dss.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fikua.dss.IntegrationTestBase;
-import com.fikua.dss.dto.CredentialsAuthorizeRequest;
-import com.fikua.dss.dto.CredentialsAuthorizeRequest.AuthData;
-import com.fikua.dss.dto.CredentialsInfoRequest;
-import com.fikua.dss.dto.CredentialsListRequest;
-import com.fikua.dss.dto.SignDocRequest;
-import com.fikua.dss.dto.SignDocRequest.Document;
-import com.fikua.dss.dto.SignHashRequest;
+import com.fikua.dss.dto.v2.CredentialsAuthorizeRequest;
+import com.fikua.dss.dto.v2.CredentialsAuthorizeRequest.AuthData;
+import com.fikua.dss.dto.v2.CredentialsInfoRequest;
+import com.fikua.dss.dto.v2.CredentialsListRequest;
+import com.fikua.dss.dto.v2.SignDocRequest;
+import com.fikua.dss.dto.v2.SignDocRequest.Document;
+import com.fikua.dss.dto.v2.SignHashRequest;
 import com.fikua.dss.service.TokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,8 +24,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * CSC v2 (2.1.0.1) conformance: POST info, `authData` array authorize,
+ * `hashes`+`hashAlgorithmOID` signHash, and signDoc (v2-only). See
+ * {@link CscV1ControllerTest} for the v1 surface.
+ */
 @AutoConfigureMockMvc
-class CscControllerTest extends IntegrationTestBase {
+class CscV2ControllerTest extends IntegrationTestBase {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
@@ -45,25 +50,28 @@ class CscControllerTest extends IntegrationTestBase {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
     }
 
-    // -- /csc/v2/info -------------------------------------------------------
+    // -- /csc/v2/info ---------------------------------------------------------
 
     @Test
-    void infoReturnsServiceMetadata() throws Exception {
+    void infoIsPostAndIncludesV2RequiredFields() throws Exception {
         mockMvc.perform(post("/csc/v2/info")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.specs").value("2.0.0.0"));
+                .andExpect(jsonPath("$.specs").value("2.0.0.0"))
+                .andExpect(jsonPath("$.signature_formats").exists())
+                .andExpect(jsonPath("$.conformance_levels").isArray())
+                .andExpect(jsonPath("$.methods", org.hamcrest.Matchers.hasItem("signatures/signDoc")));
     }
 
-    // -- /csc/v2/credentials/list ------------------------------------------
+    // -- /csc/v2/credentials/list ----------------------------------------------
 
     @Test
     void credentialsListRequiresBearer() throws Exception {
         mockMvc.perform(post("/csc/v2/credentials/list")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(
-                                new CredentialsListRequest("user", true, null, true, true, true))))
+                                new CredentialsListRequest("user", true, null, true, true, true, null, null))))
                 .andExpect(status().isBadRequest()); // missing required Authorization header
     }
 
@@ -73,7 +81,7 @@ class CscControllerTest extends IntegrationTestBase {
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(
-                                new CredentialsListRequest("user", true, null, true, true, true))))
+                                new CredentialsListRequest("user", true, null, true, true, true, null, null))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.credentialIDs[0]").value("mock-credential-001"));
     }
@@ -84,27 +92,29 @@ class CscControllerTest extends IntegrationTestBase {
                         .header("Authorization", "Bearer nope")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(
-                                new CredentialsListRequest("u", true, null, true, true, true))))
+                                new CredentialsListRequest("u", true, null, true, true, true, null, null))))
                 .andExpect(status().isUnauthorized());
     }
 
-    // -- /csc/v2/credentials/info ------------------------------------------
+    // -- /csc/v2/credentials/info ----------------------------------------------
 
     @Test
-    void credentialsInfoReturnsCertChain() throws Exception {
-        var req = new CredentialsInfoRequest("mock-credential-001", "chain", "true", "true");
+    void credentialsInfoUsesAuthObjectNotAuthMode() throws Exception {
+        var req = new CredentialsInfoRequest("mock-credential-001", "chain", true, true, null, null);
         mockMvc.perform(post("/csc/v2/credentials/info")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cert.status").value("valid"))
-                .andExpect(jsonPath("$.cert.certificates").isArray());
+                .andExpect(jsonPath("$.cert.certificates").isArray())
+                .andExpect(jsonPath("$.auth.mode").value("explicit"))
+                .andExpect(jsonPath("$.auth.objects").isArray());
     }
 
     @Test
     void credentialsInfoRejectsUnknownCredential() throws Exception {
-        var req = new CredentialsInfoRequest("wrong-cred", "chain", "true", "true");
+        var req = new CredentialsInfoRequest("wrong-cred", "chain", true, true, null, null);
         mockMvc.perform(post("/csc/v2/credentials/info")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -112,14 +122,14 @@ class CscControllerTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest());
     }
 
-    // -- /csc/v2/credentials/authorize -------------------------------------
+    // -- /csc/v2/credentials/authorize ------------------------------------------
 
     @Test
-    void credentialsAuthorizeIssuesSad() throws Exception {
+    void authorizeUsesAuthDataArrayNotPin() throws Exception {
         var hash = sha256Base64Url("hello".getBytes());
         var req = new CredentialsAuthorizeRequest(
                 "mock-credential-001", 1, List.of(hash), "2.16.840.1.101.3.4.2.1",
-                List.of(new AuthData("password", "mock-password")));
+                List.of(new AuthData("password", "mock-password")), null, null);
         mockMvc.perform(post("/csc/v2/credentials/authorize")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -129,10 +139,10 @@ class CscControllerTest extends IntegrationTestBase {
     }
 
     @Test
-    void credentialsAuthorizeFailsWithoutPasswordAuthData() throws Exception {
+    void authorizeFailsWithoutPasswordAuthData() throws Exception {
         var req = new CredentialsAuthorizeRequest(
                 "mock-credential-001", 1, List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1",
-                List.of());
+                List.of(), null, null);
         mockMvc.perform(post("/csc/v2/credentials/authorize")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -141,10 +151,10 @@ class CscControllerTest extends IntegrationTestBase {
     }
 
     @Test
-    void credentialsAuthorizeFailsWithWrongPassword() throws Exception {
+    void authorizeFailsWithWrongPassword() throws Exception {
         var req = new CredentialsAuthorizeRequest(
                 "mock-credential-001", 1, List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1",
-                List.of(new AuthData("password", "WRONG")));
+                List.of(new AuthData("password", "WRONG")), null, null);
         mockMvc.perform(post("/csc/v2/credentials/authorize")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -152,14 +162,14 @@ class CscControllerTest extends IntegrationTestBase {
                 .andExpect(status().isUnauthorized());
     }
 
-    // -- /csc/v2/signatures/signHash ---------------------------------------
+    // -- /csc/v2/signatures/signHash --------------------------------------------
 
     @Test
-    void signHashReturnsSignatures() throws Exception {
+    void signHashUsesHashesField() throws Exception {
         var hash = sha256Base64Url("hello".getBytes());
         var sad = issueSad();
         var req = new SignHashRequest("mock-credential-001", sad, List.of(hash),
-                "2.16.840.1.101.3.4.2.1", null);
+                "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -172,7 +182,7 @@ class CscControllerTest extends IntegrationTestBase {
     @Test
     void signHashRejectsExpiredOrInvalidSad() throws Exception {
         var req = new SignHashRequest("mock-credential-001", "not-a-sad",
-                List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1", null);
+                List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -180,27 +190,32 @@ class CscControllerTest extends IntegrationTestBase {
                 .andExpect(status().isUnauthorized());
     }
 
-    // -- /csc/v2/signatures/signDoc ----------------------------------------
+    // -- /csc/v2/signatures/signDoc ----------------------------------------------
 
     @Test
-    void signDocReturnsSignatures() throws Exception {
+    void signDocAcceptsDocumentsModeAndReturnsSignatureObjectField() throws Exception {
         var docB64 = Base64.getEncoder().encodeToString("a tiny document".getBytes());
         var sad = issueSad();
-        var req = new SignDocRequest("mock-credential-001", sad, "eu_eidas_qes",
-                List.of(new Document(docB64, "P", "B-B", null)));
+        var req = new SignDocRequest("mock-credential-001", "eu_eidas_qes", sad,
+                null,
+                List.of(new Document(docB64, "P", "Ades-B-B", null, null)),
+                "2.16.840.1.101.3.4.2.1", null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signDoc")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.DocumentWithSignature").isArray());
+                .andExpect(jsonPath("$.DocumentWithSignature").isArray())
+                .andExpect(jsonPath("$.SignatureObject").isArray());
     }
 
     @Test
     void signDocRejectsInvalidSad() throws Exception {
         var docB64 = Base64.getEncoder().encodeToString("data".getBytes());
-        var req = new SignDocRequest("mock-credential-001", "bad-sad", "eu_eidas_qes",
-                List.of(new Document(docB64, "P", "B-B", null)));
+        var req = new SignDocRequest("mock-credential-001", "eu_eidas_qes", "bad-sad",
+                null,
+                List.of(new Document(docB64, "P", "Ades-B-B", null, null)),
+                "2.16.840.1.101.3.4.2.1", null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signDoc")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)

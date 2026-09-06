@@ -1,6 +1,6 @@
 package com.fikua.dss.web;
 
-import com.fikua.dss.dto.ErrorResponse;
+import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
