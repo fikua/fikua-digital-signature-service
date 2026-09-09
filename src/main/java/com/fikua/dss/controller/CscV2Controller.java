@@ -211,6 +211,11 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
 
+        if (request.hashes() == null || request.hashes().isEmpty()) {
+            return ResponseEntity.badRequest().body(
+                    new ErrorResponse("invalid_request", "Missing hashes in request"));
+        }
+
         var signatures = signingService.signHashes(request.hashes(), tenantResult.tenant());
         log.info("credential.signed",
                 kv("event", "credential.signed"),
