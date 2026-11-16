@@ -194,8 +194,9 @@ Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive 
 
 ## Releases
 
-- **Image:** `fikua/fikua-digital-signature-service` on Docker Hub (public).
-- **CI:** `.github/workflows/release.yml` builds and pushes on every push to `main` (`:latest`) and on `vX.Y.Z` tags (semver tags).
+- **Image:** `ghcr.io/fikua/fikua-digital-signature-service` (also on Docker Hub until ADR 0015 closes it).
+- **CI:** `.github/workflows/ci.yml` (shared workflows) publishes `latest` and `sha-<short>` on every push to `main`, and `X.Y.Z` on every `vX.Y.Z` tag.
+- **Deploy:** not from this repository. `fikua-platform-iac/projects/fikua-lab/dss/compose.yaml` pins a release and Dependabot proposes each new one (fikua-docs ADR 0019).
 - Multi-arch: `linux/amd64` + `linux/arm64`.
 
 ## Contributing
