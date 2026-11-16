@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   through the OpenTelemetry logs API with `event.domain = audit` and only the
   attributes of the catalogue in `AuditEvents`. The platform Collector archives
   them for five years in a locked bucket.
+- **Business counter** `dss.business.operations` (operation, outcome, tenant and,
+  for a rejection, error.type), one increment per audit event (fikua-docs
+  observability convention, OBS-09).
+- Unhandled errors carry `error.type` and `exception.type` (MDC), OBS-08.
 
 ### Fixed
 - An unknown path (`NoResourceFoundException`: scanners, `/actuator/health`)

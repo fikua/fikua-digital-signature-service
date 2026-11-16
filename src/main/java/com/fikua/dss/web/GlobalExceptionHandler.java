@@ -4,6 +4,7 @@ import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -81,7 +82,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
-        log.error("Unhandled error", e);
+        // error.type and exception.type travel as MDC attributes, so the log
+        // record and the metrics join on the same stable code (fikua-docs
+        // observability convention, OBS-08).
+        try (var errorType = MDC.putCloseable("error.type", "server_error");
+             var exceptionType = MDC.putCloseable("exception.type", e.getClass().getSimpleName())) {
+            log.error("Unhandled error", e);
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("server_error", "Internal server error"));
     }

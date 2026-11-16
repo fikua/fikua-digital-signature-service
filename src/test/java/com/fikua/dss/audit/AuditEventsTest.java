@@ -7,6 +7,9 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.logs.SdkLoggerProvider;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor;
+import io.opentelemetry.sdk.metrics.SdkMeterProvider;
+import io.opentelemetry.sdk.metrics.data.LongPointData;
+import io.opentelemetry.sdk.testing.exporter.InMemoryMetricReader;
 import io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,12 +22,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AuditEventsTest {
 
     private InMemoryLogRecordExporter exporter;
+    private InMemoryMetricReader metrics;
     private AuditEvents audit;
 
     @BeforeEach
     void setUp() {
         exporter = InMemoryLogRecordExporter.create();
+        metrics = InMemoryMetricReader.create();
         var sdk = OpenTelemetrySdk.builder()
+                .setMeterProvider(SdkMeterProvider.builder().registerMetricReader(metrics).build())
                 .setLoggerProvider(SdkLoggerProvider.builder()
                         .addLogRecordProcessor(SimpleLogRecordProcessor.create(exporter))
                         .build())
@@ -79,6 +85,38 @@ class AuditEventsTest {
         var record = single();
         assertThat(record.getAttributes().get(AuditEvents.TENANT)).isEqualTo("tenant-a");
         assertThat(record.getAttributes().get(AuditEvents.REASON)).isEqualTo("invalid_sad");
+    }
+
+    @Test
+    void everyEventIsCountedAsABusinessOperation() {
+        audit.credentialSigned("tenant-a", "cred-1", 1, "v2");
+        audit.credentialSigned("tenant-a", "cred-1", 2, "v2");
+        audit.authRejected(null, Reason.INVALID_CLIENT);
+
+        var points = metrics.collectAllMetrics().stream()
+                .filter(m -> m.getName().equals("dss.business.operations"))
+                .flatMap(m -> m.getLongSumData().getPoints().stream())
+                .toList();
+        assertThat(points).hasSize(2);
+
+        var signed = point(points, "credential.sign");
+        assertThat(signed.getValue()).isEqualTo(2);
+        assertThat(signed.getAttributes().get(AuditEvents.OUTCOME)).isEqualTo("success");
+        assertThat(signed.getAttributes().get(AuditEvents.TENANT_LABEL)).isEqualTo("tenant-a");
+        assertThat(signed.getAttributes().get(AuditEvents.ERROR_TYPE)).isNull();
+
+        var rejected = point(points, "token.issue");
+        assertThat(rejected.getValue()).isEqualTo(1);
+        assertThat(rejected.getAttributes().get(AuditEvents.OUTCOME)).isEqualTo("rejected");
+        assertThat(rejected.getAttributes().get(AuditEvents.ERROR_TYPE)).isEqualTo("invalid_client");
+        assertThat(rejected.getAttributes().get(AuditEvents.TENANT_LABEL)).isEqualTo("unknown");
+    }
+
+    private static LongPointData point(java.util.List<LongPointData> points, String operation) {
+        return points.stream()
+                .filter(p -> operation.equals(p.getAttributes().get(AuditEvents.OPERATION)))
+                .findFirst()
+                .orElseThrow();
     }
 
     private LogRecordData single() {

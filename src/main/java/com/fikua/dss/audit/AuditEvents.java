@@ -6,6 +6,7 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.logs.Logger;
 import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.api.metrics.LongCounter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -33,6 +34,11 @@ import org.springframework.stereotype.Component;
  * </table>
  *
  * <p>No hash, document, IP address or personal name is ever an attribute.
+ *
+ * <p>Every event is also counted in {@code dss.business.operations} (fikua-docs
+ * observability convention, OBS-09), labelled {@code operation}, {@code outcome},
+ * {@code tenant} and, for a rejection, {@code error.type}. Dashboards read the counter;
+ * the archive keeps the events.
  */
 @Component
 public class AuditEvents {
@@ -47,21 +53,29 @@ public class AuditEvents {
     static final AttributeKey<String> CSC_VERSION = AttributeKey.stringKey("csc.version");
     static final AttributeKey<String> REASON = AttributeKey.stringKey("reason");
 
-    /** Reasons for {@code auth.rejected}. */
+    static final AttributeKey<String> OPERATION = AttributeKey.stringKey("operation");
+    static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("outcome");
+    static final AttributeKey<String> ERROR_TYPE = AttributeKey.stringKey("error.type");
+    static final AttributeKey<String> TENANT_LABEL = AttributeKey.stringKey("tenant");
+
+    /** Reasons for {@code auth.rejected}, with the business operation each one refuses. */
     public enum Reason {
-        INVALID_CLIENT("invalid_client"),
-        INVALID_TOKEN("invalid_token"),
-        INVALID_AUTHORIZATION_DATA("invalid_authorization_data"),
-        INVALID_SAD("invalid_sad");
+        INVALID_CLIENT("invalid_client", "token.issue"),
+        INVALID_TOKEN("invalid_token", "request.authenticate"),
+        INVALID_AUTHORIZATION_DATA("invalid_authorization_data", "credential.authorize"),
+        INVALID_SAD("invalid_sad", "credential.sign");
 
         private final String value;
+        private final String operation;
 
-        Reason(String value) {
+        Reason(String value, String operation) {
             this.value = value;
+            this.operation = operation;
         }
     }
 
     private final Logger logger;
+    private final LongCounter operations;
 
     /** Uses the application's OpenTelemetry instance; a no-op one when there is none. */
     @Autowired
@@ -71,16 +85,23 @@ public class AuditEvents {
 
     AuditEvents(OpenTelemetry openTelemetry) {
         this.logger = openTelemetry.getLogsBridge().loggerBuilder(INSTRUMENTATION_SCOPE).build();
+        this.operations = openTelemetry.getMeter(INSTRUMENTATION_SCOPE)
+                .counterBuilder("dss.business.operations")
+                .setDescription("Business operations of the signature service, by operation, outcome and tenant")
+                .setUnit("{operation}")
+                .build();
     }
 
     public void tokenIssued(String tenantClientId) {
         emit("token.issued", Attributes.builder().put(TENANT, tenantClientId));
+        count("token.issue", "success", tenantClientId, null);
     }
 
     public void credentialAuthorized(String tenantClientId, String credentialId) {
         emit("credential.authorized", Attributes.builder()
                 .put(TENANT, tenantClientId)
                 .put(CREDENTIAL, credentialId));
+        count("credential.authorize", "success", tenantClientId, null);
     }
 
     public void credentialSigned(String tenantClientId, String credentialId, int signatureCount, String cscVersion) {
@@ -89,6 +110,7 @@ public class AuditEvents {
                 .put(CREDENTIAL, credentialId)
                 .put(SIGNATURE_COUNT, signatureCount)
                 .put(CSC_VERSION, cscVersion));
+        count("credential.sign", "success", tenantClientId, null);
     }
 
     /**
@@ -101,6 +123,18 @@ public class AuditEvents {
             attributes.put(TENANT, knownTenantClientId);
         }
         emit("auth.rejected", attributes);
+        count(reason.operation, "rejected", knownTenantClientId, reason.value);
+    }
+
+    private void count(String operation, String outcome, String tenantClientId, String errorType) {
+        var labels = Attributes.builder()
+                .put(OPERATION, operation)
+                .put(OUTCOME, outcome)
+                .put(TENANT_LABEL, tenantClientId != null ? tenantClientId : "unknown");
+        if (errorType != null) {
+            labels.put(ERROR_TYPE, errorType);
+        }
+        operations.add(1, labels.build());
     }
 
     private void emit(String name, AttributesBuilder attributes) {
