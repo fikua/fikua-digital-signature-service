@@ -57,12 +57,12 @@ config.
 
 ## Release & deployment
 
-- **Image:** `fikua/fikua-digital-signature-service` on Docker Hub (public).
+- **Image:** `ghcr.io/fikua/fikua-digital-signature-service` (also Docker Hub until ADR 0015 closes it).
 - **Repo:** `github.com/fikua/fikua-digital-signature-service` (public, Apache-2.0).
-- **CI/CD:** `.github/workflows/release.yml` builds and pushes on push to
-  `main` (tag `latest`) and on `v*.*.*` tags (semver tags).
-- **VPS:** manual deploy via `deploy.sh` (uses `vps.fikua.com` SSH via
-  Cloudflare Tunnel). Public endpoint `mock-qtsp.altia.fikua.com` (name
+- **CI:** `.github/workflows/ci.yml` (shared workflows) publishes `latest`
+  and `sha-<short>` on push to `main`, and `X.Y.Z` on `v*.*.*` tags.
+- **VPS:** never deployed from here. `fikua-platform-iac/projects/fikua-lab/dss/compose.yaml`
+  pins the release; Dependabot there proposes new ones (fikua-docs ADR 0019). Public endpoint `mock-qtsp.altia.fikua.com` (name
   kept for compatibility with existing STG seeds/configs).
 
 ## Certificates — never bake into the image
