@@ -1,4 +1,6 @@
-FROM docker.io/gradle:9.3.1-jdk25 AS build
+# The JAR is the same on every architecture: compile once on the build
+# platform, so Gradle never runs under QEMU in multi-arch builds.
+FROM --platform=$BUILDPLATFORM docker.io/gradle:9.3.1-jdk25 AS build
 WORKDIR /workspace
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
