@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Audit events** (fikua-docs ADR 0014 and ADR 0017): `token.issued`,
+  `credential.authorized`, `credential.signed` and `auth.rejected`, emitted
+  through the OpenTelemetry logs API with `event.domain = audit` and only the
+  attributes of the catalogue in `AuditEvents`. The platform Collector archives
+  them for five years in a locked bucket.
+
+### Fixed
+- An unknown path (`NoResourceFoundException`: scanners, `/actuator/health`)
+  answers 404 instead of being logged as an unhandled ERROR with a stack trace.
+
 ## [0.3.1] - 2026-05-22
 
 ### Notes

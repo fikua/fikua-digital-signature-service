@@ -8,6 +8,8 @@ import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.HttpMethod;
 
 import java.lang.reflect.Method;
 
@@ -21,6 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class GlobalExceptionHandlerUnitTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @Test
+    void unknownPathIsA404NotAServerError() {
+        var resp = handler.handleNoResource(new NoResourceFoundException(HttpMethod.GET, "actuator/health"));
+        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+        assertNotNull(resp.getBody());
+        assertEquals("not_found", resp.getBody().error());
+    }
 
     @Test
     void handlesMalformedJson() {

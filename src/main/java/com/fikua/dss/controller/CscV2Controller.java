@@ -1,5 +1,7 @@
 package com.fikua.dss.controller;
 
+import com.fikua.dss.audit.AuditEvents;
+import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.dto.v2.Auth;
 import com.fikua.dss.dto.v2.CertInfo;
@@ -59,15 +61,18 @@ public class CscV2Controller {
     private final TokenService tokenService;
     private final CertificateService certificateService;
     private final SigningService signingService;
+    private final AuditEvents audit;
 
     public CscV2Controller(
             TokenService tokenService,
             CertificateService certificateService,
-            SigningService signingService
+            SigningService signingService,
+            AuditEvents audit
     ) {
         this.tokenService = tokenService;
         this.certificateService = certificateService;
         this.signingService = signingService;
+        this.audit = audit;
     }
 
     @PostMapping("/info")
@@ -186,8 +191,10 @@ public class CscV2Controller {
 
         try {
             var sad = tokenService.issueSad(tenantResult.tenantClientId(), request.credentialID(), password);
+            audit.credentialAuthorized(tenantResult.tenantClientId(), request.credentialID());
             return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, null));
         } catch (SecurityException e) {
+            audit.authRejected(tenantResult.tenantClientId(), Reason.INVALID_AUTHORIZATION_DATA);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_request", e.getMessage()));
         }
@@ -207,6 +214,7 @@ public class CscV2Controller {
         if (tenantResult.error() != null) return tenantResult.error();
 
         if (!tokenService.validateSad(tenantResult.tenantClientId(), request.SAD(), request.credentialID())) {
+            audit.authRejected(tenantResult.tenantClientId(), Reason.INVALID_SAD);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
@@ -222,6 +230,7 @@ public class CscV2Controller {
                 kv("credential_id", LogSanitizer.clean(request.credentialID())),
                 kv("signature_count", signatures.size()),
                 kv("result", "success"));
+        audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignHashResponse(signatures, null));
     }
 
@@ -240,6 +249,7 @@ public class CscV2Controller {
         if (tenantResult.error() != null) return tenantResult.error();
 
         if (!tokenService.validateSad(tenantResult.tenantClientId(), request.SAD(), request.credentialID())) {
+            audit.authRejected(tenantResult.tenantClientId(), Reason.INVALID_SAD);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
@@ -258,6 +268,7 @@ public class CscV2Controller {
                     kv("credential_id", LogSanitizer.clean(request.credentialID())),
                     kv("signature_count", signedDocs.size()),
                     kv("result", "success"));
+            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signedDocs.size(), "v2");
             return ResponseEntity.ok(new SignDocResponse(signedDocs, signatures, null, null));
         }
 
@@ -272,6 +283,7 @@ public class CscV2Controller {
                     kv("credential_id", LogSanitizer.clean(request.credentialID())),
                     kv("signature_count", signatures.size()),
                     kv("result", "success"));
+            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
             return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
         }
 
@@ -287,6 +299,7 @@ public class CscV2Controller {
         var token = authHeader.substring(7);
         var tenantClientId = tokenService.resolveTenantClientId(token);
         if (tenantClientId == null) {
+            audit.authRejected(null, Reason.INVALID_TOKEN);
             return TenantResolution.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Invalid or expired access token")));
         }

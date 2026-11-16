@@ -1,5 +1,7 @@
 package com.fikua.dss.controller;
 
+import com.fikua.dss.audit.AuditEvents;
+import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.dto.common.TokenResponse;
@@ -21,10 +23,12 @@ public class OAuth2Controller {
 
     private final TokenService tokenService;
     private final DssProperties properties;
+    private final AuditEvents audit;
 
-    public OAuth2Controller(TokenService tokenService, DssProperties properties) {
+    public OAuth2Controller(TokenService tokenService, DssProperties properties, AuditEvents audit) {
         this.tokenService = tokenService;
         this.properties = properties;
+        this.audit = audit;
     }
 
     @PostMapping(value = "/oauth2/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -53,17 +57,24 @@ public class OAuth2Controller {
             clientId = parts[0];
             clientSecret = parts.length > 1 ? parts[1] : "";
         } else {
+            audit.authRejected(null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", "Missing Basic authentication header"));
         }
 
         try {
             var token = tokenService.issueAccessToken(clientId, clientSecret);
+            audit.tokenIssued(clientId);
             return ResponseEntity.ok(new TokenResponse(token, "Bearer", properties.tokenTtlSeconds()));
         } catch (SecurityException e) {
+            audit.authRejected(isKnownTenant(clientId) ? clientId : null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", e.getMessage()));
         }
     }
 
+    private boolean isKnownTenant(String clientId) {
+        return properties.tenants() != null
+                && properties.tenants().stream().anyMatch(t -> t.clientId().equals(clientId));
+    }
 }
