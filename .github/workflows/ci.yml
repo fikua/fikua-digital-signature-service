@@ -1,0 +1,45 @@
+name: CI
+
+# Shared workflows: fikua/fikua-ci-workflows (ADR 0018). Publishes
+# fikua/fikua-digital-signature-service on every push to main and every v*.*.*
+# tag once the build passes; deploying it is a separate step.
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+    paths-ignore: ['**.md']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: fikua/fikua-ci-workflows/.github/workflows/java-ci.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
+    with:
+      # build runs the tests; jacocoTestReport writes the XML report Sonar reads.
+      gradle-tasks: build jacocoTestReport
+      sonar: ${{ github.ref_type != 'tag' && github.event_name != 'workflow_dispatch' }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  gitleaks:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    uses: fikua/fikua-ci-workflows/.github/workflows/gitleaks.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
+
+  release:
+    needs: test
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    uses: fikua/fikua-ci-workflows/.github/workflows/image-release.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
+    with:
+      image: fikua-digital-signature-service
+    secrets:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
