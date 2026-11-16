@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    uses: fikua/fikua-ci-workflows/.github/workflows/java-ci.yml@2d40554f8f019fc7e0968d97e6dc27f2b4778352  # v1.1.0
+    uses: fikua/fikua-ci-workflows/.github/workflows/java-ci.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
     with:
       # build runs the tests; jacocoTestReport writes the XML report Sonar reads.
       gradle-tasks: build jacocoTestReport
@@ -29,7 +29,7 @@ jobs:
 
   gitleaks:
     if: github.event_name == 'push' || github.event_name == 'pull_request'
-    uses: fikua/fikua-ci-workflows/.github/workflows/gitleaks.yml@2d40554f8f019fc7e0968d97e6dc27f2b4778352  # v1.1.0
+    uses: fikua/fikua-ci-workflows/.github/workflows/gitleaks.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
 
   release:
     needs: test
@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: fikua/fikua-ci-workflows/.github/workflows/image-release.yml@2d40554f8f019fc7e0968d97e6dc27f2b4778352  # v1.1.0
+    uses: fikua/fikua-ci-workflows/.github/workflows/image-release.yml@383c2bdf97121b1405704f30468b0a45272cae73  # v1.2.0
     with:
       image: fikua-digital-signature-service
     secrets:
