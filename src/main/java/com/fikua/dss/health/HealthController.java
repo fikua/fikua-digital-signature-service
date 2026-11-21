@@ -1,9 +1,9 @@
 package com.fikua.dss.health;
 
-import org.springframework.boot.actuate.health.CompositeHealth;
-import org.springframework.boot.actuate.health.HealthComponent;
-import org.springframework.boot.actuate.health.HealthEndpoint;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescriptor;
+import org.springframework.boot.health.actuate.endpoint.HealthDescriptor;
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.health.contributor.Status;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,11 +36,11 @@ public class HealthController {
 
     @GetMapping(value = "/health", produces = "application/health+json")
     public ResponseEntity<Map<String, Object>> health() {
-        HealthComponent health = healthEndpoint.health();
+        HealthDescriptor health = healthEndpoint.health();
         String status = map(health.getStatus());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", status);
-        if (health instanceof CompositeHealth composite && composite.getComponents() != null) {
+        if (health instanceof CompositeHealthDescriptor composite && composite.getComponents() != null) {
             Map<String, List<Map<String, String>>> checks = new TreeMap<>();
             composite.getComponents().forEach((name, component) ->
                     checks.put(name + ":status", List.of(Map.of("status", map(component.getStatus())))));
