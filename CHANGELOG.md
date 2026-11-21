@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.1] - 2026-11-21
+
+### Security
+- OpenAPI spec and Swagger UI off unless `SPRINGDOC_ENABLED=true`: in
+  production `/v3/api-docs` and `/swagger-ui.html` were public.
+
+### Changed
+- Log attributes configured with the OpenTelemetry starter's current
+  properties (`common.logging.structured-attributes`,
+  `logback-appender.experimental.mdc-attributes`); the old ones are deprecated.
+
 ## [0.6.0] - 2026-11-21
 
 ### Changed

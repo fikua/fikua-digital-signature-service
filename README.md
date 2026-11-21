@@ -59,8 +59,8 @@ The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.js
 | GET    | `/health/liveness`  | Kubernetes-style liveness probe                                        |
 | GET    | `/health/readiness` | Readiness probe (includes the `certificate` indicator)                 |
 | GET    | `/info`             | Build, Java and OS metadata                                            |
-| GET    | `/v3/api-docs`      | OpenAPI 3 specification                                                |
-| GET    | `/swagger-ui.html`  | Interactive Swagger UI (lets you authenticate against `/oauth2/token`) |
+| GET    | `/v3/api-docs`      | OpenAPI 3 specification (only with `SPRINGDOC_ENABLED=true`)           |
+| GET    | `/swagger-ui.html`  | Swagger UI (only with `SPRINGDOC_ENABLED=true`)                        |
 
 ## Configuration
 
@@ -180,6 +180,7 @@ Client                                  DSS
 
 ## OpenAPI / Swagger
 
+Off by default, so production never publishes them; set `SPRINGDOC_ENABLED=true` to turn them on locally.
 Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive UI is at [`/swagger-ui.html`](http://localhost:9090/swagger-ui.html). The OAuth2 `client_credentials` flow is declared, so you can use the "Authorize" button in the UI to mint a token against `/oauth2/token` and call the rest of the endpoints from the browser.
 
 ## Tech stack
