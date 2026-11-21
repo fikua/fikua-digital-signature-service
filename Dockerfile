@@ -8,7 +8,9 @@ COPY src ./src
 RUN gradle bootJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine
-RUN addgroup -S nonroot && adduser -S nonroot -G nonroot
+# uid/gid 65532, the distroless "nonroot" every Fikua image runs as: the
+# platform writes secret files as root:65532 0640 (fikua-docs conv-deployment.md).
+RUN addgroup -S -g 65532 nonroot && adduser -S -u 65532 -G nonroot nonroot
 USER nonroot
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar /app/dss.jar
