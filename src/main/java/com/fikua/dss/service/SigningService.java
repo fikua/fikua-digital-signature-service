@@ -36,10 +36,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Signs with the EU DSS libraries (European Commission, DSS 6.5).
  *
  * <ul>
- *   <li>{@code signHash}: the client computed the digest; the credential's key
- *       signs it ({@link SignatureTokenConnection#signDigest}). ECDSA signatures
- *       are ASN.1 DER, RSA ones PKCS#1 v1.5 with the DigestInfo of the digest
- *       algorithm, as before.</li>
+ *   <li>{@code signHash}: the client computed the SHA-256 digest; the
+ *       credential's P-256 key signs it ({@link SignatureTokenConnection#signDigest}),
+ *       ES256 with the signature in ASN.1 DER, as before. Any other hash
+ *       algorithm is refused ({@link Es256}).</li>
  *   <li>{@code signDoc}: an AdES signature of the document, JAdES (J) or CAdES
  *       (C), baseline B. Without a {@code signature_format} the raw signature
  *       of the document is returned, as before.</li>
@@ -70,6 +70,7 @@ public class SigningService {
     /** The result of signing one document: the signed document, or the detached signature. */
     public record SignedDocument(String documentWithSignature, String signatureObject) {}
 
+    /** ES256: SHA-256 digests only ({@link Es256}). */
     private static final DigestAlgorithm DEFAULT_DIGEST = DigestAlgorithm.SHA256;
 
     private final Map<String, SigningKey> keys = new ConcurrentHashMap<>();
@@ -81,7 +82,7 @@ public class SigningService {
                                    CertificateService.TenantMaterial credential) {
         var digestAlgorithm = digestAlgorithm(hashAlgorithmOid);
         var key = key(credential);
-        var signatureAlgorithm = SignatureAlgorithm.getAlgorithm(key.entry().getEncryptionAlgorithm(), digestAlgorithm);
+        var signatureAlgorithm = SignatureAlgorithm.ECDSA_SHA256;
         var signatures = new ArrayList<String>();
         for (var hashB64 : hashesBase64) {
             var hash = decode(hashB64);
@@ -137,11 +138,10 @@ public class SigningService {
         if (oid == null || oid.isBlank()) {
             return DEFAULT_DIGEST;
         }
-        try {
-            return DigestAlgorithm.forOID(oid.trim());
-        } catch (IllegalArgumentException _) {
-            throw new InvalidRequestException("Unsupported hashAlgorithmOID");
+        if (!Es256.SHA256_OID.equals(oid.trim())) {
+            throw new InvalidRequestException("Only ES256: hashAlgorithmOID must be SHA-256 (" + Es256.SHA256_OID + ")");
         }
+        return DEFAULT_DIGEST;
     }
 
     private static void requireBaselineB(String conformanceLevel) {
@@ -186,6 +186,7 @@ public class SigningService {
         private static final SecureRandom RANDOM = new SecureRandom();
 
         static SigningKey of(CertificateService.TenantMaterial credential) {
+            Es256.requireP256(credential.certificateChain().getFirst());
             try {
                 // Never leaves the process: it only protects the in-memory PKCS#12.
                 var seed = new byte[16];
