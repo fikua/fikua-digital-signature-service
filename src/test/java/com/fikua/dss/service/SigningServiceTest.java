@@ -85,15 +85,14 @@ class SigningServiceTest {
 
     @Test
     void signHashRefusesAHashOfTheWrongLength() throws Exception {
-        var sha384 = b64url(MessageDigest.getInstance("SHA-384").digest(DATA));
-        assertThrows(InvalidRequestException.class,
-                () -> service.signHashes(List.of(sha384), SHA256, ec));
+        var hashes = List.of(b64url(MessageDigest.getInstance("SHA-384").digest(DATA)));
+        assertThrows(InvalidRequestException.class, () -> service.signHashes(hashes, SHA256, ec));
     }
 
     @Test
     void signHashRefusesAnUnknownAlgorithm() {
-        assertThrows(InvalidRequestException.class,
-                () -> service.signHashes(List.of("aGVsbG8"), "1.2.3.4", ec));
+        var hashes = List.of("aGVsbG8");
+        assertThrows(InvalidRequestException.class, () -> service.signHashes(hashes, "1.2.3.4", ec));
     }
 
     @Test

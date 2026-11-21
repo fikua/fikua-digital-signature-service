@@ -139,7 +139,7 @@ public class SigningService {
         }
         try {
             return DigestAlgorithm.forOID(oid.trim());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new InvalidRequestException("Unsupported hashAlgorithmOID");
         }
     }
@@ -155,10 +155,10 @@ public class SigningService {
     private static byte[] decode(String hashB64) {
         try {
             return Base64.getUrlDecoder().decode(hashB64);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             try {
                 return Base64.getDecoder().decode(hashB64);
-            } catch (IllegalArgumentException e2) {
+            } catch (IllegalArgumentException _) {
                 throw new InvalidRequestException("Hash is not base64");
             }
         }
@@ -183,11 +183,13 @@ public class SigningService {
     /** A DSS token over an in-memory PKCS#12 holding the credential's key and chain. */
     record SigningKey(SignatureTokenConnection token, DSSPrivateKeyEntry entry) {
 
+        private static final SecureRandom RANDOM = new SecureRandom();
+
         static SigningKey of(CertificateService.TenantMaterial credential) {
             try {
                 // Never leaves the process: it only protects the in-memory PKCS#12.
                 var seed = new byte[16];
-                new SecureRandom().nextBytes(seed);
+                RANDOM.nextBytes(seed);
                 var password = HexFormat.of().formatHex(seed).toCharArray();
                 var keyStore = KeyStore.getInstance("PKCS12");
                 keyStore.load(null, null);

@@ -225,39 +225,46 @@ public class CscV2Controller {
         // CSC v2 input modes: documents (the service builds the AdES signature,
         // SigningService) or documentDigests (precomputed hashes, signed as in signHash).
         if (request.documents() != null && !request.documents().isEmpty()) {
-            var withSignature = new ArrayList<String>();
-            var signatureObjects = new ArrayList<String>();
-            for (var doc : request.documents()) {
-                var signed = signingService.signDocument(decodeDocument(doc.document()),
-                        doc.signature_format(), doc.conformance_level(), tenantResult.tenant());
-                if (signed.documentWithSignature() != null) withSignature.add(signed.documentWithSignature());
-                if (signed.signatureObject() != null) signatureObjects.add(signed.signatureObject());
-            }
-            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(),
-                    request.documents().size(), "v2");
-            return ResponseEntity.ok(new SignDocResponse(
-                    withSignature.isEmpty() ? null : withSignature,
-                    signatureObjects.isEmpty() ? null : signatureObjects, null, null));
+            return signDocuments(request, tenantResult);
         }
-
         if (request.documentDigests() != null && !request.documentDigests().isEmpty()) {
-            var allHashes = new ArrayList<String>();
-            for (var dd : request.documentDigests()) {
-                if (dd.hashes() != null) allHashes.addAll(dd.hashes());
-            }
-            var signatures = signingService.signHashes(allHashes, request.hashAlgorithmOID(), tenantResult.tenant());
-            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
-            return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
+            return signDocumentDigests(request, tenantResult);
         }
 
         return ResponseEntity.badRequest().body(
                 new ErrorResponse("invalid_request", "Either 'documents' or 'documentDigests' must be provided"));
     }
 
+    private ResponseEntity<SignDocResponse> signDocuments(SignDocRequest request, TenantResolution tenantResult) {
+        var withSignature = new ArrayList<String>();
+        var signatureObjects = new ArrayList<String>();
+        for (var doc : request.documents()) {
+            var signed = signingService.signDocument(decodeDocument(doc.document()),
+                    doc.signature_format(), doc.conformance_level(), tenantResult.tenant());
+            if (signed.documentWithSignature() != null) withSignature.add(signed.documentWithSignature());
+            if (signed.signatureObject() != null) signatureObjects.add(signed.signatureObject());
+        }
+        audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(),
+                request.documents().size(), "v2");
+        return ResponseEntity.ok(new SignDocResponse(
+                withSignature.isEmpty() ? null : withSignature,
+                signatureObjects.isEmpty() ? null : signatureObjects, null, null));
+    }
+
+    private ResponseEntity<SignDocResponse> signDocumentDigests(SignDocRequest request, TenantResolution tenantResult) {
+        var allHashes = new ArrayList<String>();
+        for (var dd : request.documentDigests()) {
+            if (dd.hashes() != null) allHashes.addAll(dd.hashes());
+        }
+        var signatures = signingService.signHashes(allHashes, request.hashAlgorithmOID(), tenantResult.tenant());
+        audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
+        return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
+    }
+
     private static byte[] decodeDocument(String documentBase64) {
         try {
             return Base64.getDecoder().decode(documentBase64);
-        } catch (IllegalArgumentException | NullPointerException e) {
+        } catch (IllegalArgumentException | NullPointerException _) {
             throw new InvalidRequestException("Document is not base64");
         }
     }
