@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.2] - 2026-11-21
+
+### Changed
+- **Startup with an AOT cache** (Java 25, JEP 483/514/515): the image runs a
+  training start at build time and ships the cache; the jar is extracted
+  (`-Djarmode=tools extract`). Measured locally with 384 MB: at 0.25 CPU from
+  72.7 s to 39.4 s, at 1 CPU from 5.9 s to 2.9 s; memory at rest 175 MB
+  (was 185-268 MB). The image is about 100 MB larger.
+
 ## [0.7.1] - 2026-11-21
 
 ### Changed
