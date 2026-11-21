@@ -15,4 +15,9 @@ USER nonroot
 WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar /app/dss.jar
 EXPOSE 9090
+# GET /health (OBS-17, DEP-10) with the image's busybox wget; a 503 fails it.
+# Traefik routes only to healthy containers: --start-interval makes a new one
+# healthy seconds after it is ready.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --start-interval=3s --retries=3 \
+    CMD wget -q -O /dev/null "http://127.0.0.1:${SERVER_PORT:-9090}/health" || exit 1
 ENTRYPOINT ["java", "-jar", "/app/dss.jar"]

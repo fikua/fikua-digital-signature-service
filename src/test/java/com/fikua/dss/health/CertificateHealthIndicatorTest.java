@@ -7,8 +7,12 @@ import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,26 +23,14 @@ class CertificateHealthIndicatorTest extends IntegrationTestBase {
     @Autowired CertificateHealthIndicator indicator;
 
     @Test
-    void actuatorHealthExposesCertificateComponentAsUp() throws Exception {
+    void healthAnswersTheHealthJsonFormatWithStatusesOnly() throws Exception {
         mockMvc.perform(get("/health"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.components.certificate.status").value("UP"))
-                .andExpect(jsonPath("$.components.certificate.details['mock-client.keyAlgorithm']").exists());
-    }
-
-    @Test
-    void livenessProbeIsExposed() throws Exception {
-        mockMvc.perform(get("/health/liveness"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
-    }
-
-    @Test
-    void readinessProbeIncludesCertificate() throws Exception {
-        mockMvc.perform(get("/health/readiness"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
+                .andExpect(header().string("Content-Type", containsString("application/health+json")))
+                .andExpect(jsonPath("$.status").value("pass"))
+                .andExpect(jsonPath("$.checks['certificate:status'][0].status").value("pass"))
+                .andExpect(content().string(not(containsString("keyAlgorithm"))))
+                .andExpect(content().string(not(containsString("mock-client"))));
     }
 
     @Test
@@ -48,9 +40,10 @@ class CertificateHealthIndicatorTest extends IntegrationTestBase {
     }
 
     @Test
-    void actuatorInfoExposesAppName() throws Exception {
-        mockMvc.perform(get("/info"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.app.name").value("fikua-digital-signature-service"));
+    void statusMapping() {
+        assertEquals("pass", HealthController.map(Status.UP));
+        assertEquals("fail", HealthController.map(Status.DOWN));
+        assertEquals("fail", HealthController.map(Status.OUT_OF_SERVICE));
+        assertEquals("warn", HealthController.map(Status.UNKNOWN));
     }
 }
