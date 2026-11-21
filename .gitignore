@@ -20,6 +20,8 @@ certs/
 *.key
 *.crt
 *.p12
+# Exception: public certificates the service trusts (TrustedLists).
+!src/main/resources/trust/*.p12
 *.pfx
 *.jks
 

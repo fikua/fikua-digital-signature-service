@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.8.0] - 2026-11-22
+
+### Added
+- **EU trusted lists** (ETSI TS 119 612) with the EU DSS libraries
+  (`dss-tsl-validation`): a local copy of the List of Trusted Lists and the 31
+  national lists (~4,700 trust anchors). After the start a background thread
+  loads the copy on disk, then downloads what changed, every hour
+  (`dss.trusted-lists.refresh`); never in the request path. The LoTL signature
+  is checked against the signers announced in the Official Journal
+  (`trust/eu-lotl-signers.p12`, from the EU DSS demonstrations, OJ C/2026/1944)
+  and the pivots after it; a list with an invalid signature or past its next
+  update is not trusted.
+- `trustedLists` in `/health`: `pass` while the copy is fresh, `warn` before
+  the first refresh or when it is older than `dss.trusted-lists.max-age` (26 h);
+  never `fail`, signing does not depend on it.
+
+### Changed
+- The image runs the JVM with 60 % of the container memory as heap (the default
+  is 25 %): the trust anchors need ~145 MB. Deploy with 640 MB and a volume at
+  `/var/lib/dss/trusted-lists`.
+
 ## [0.7.2] - 2026-11-21
 
 ### Changed

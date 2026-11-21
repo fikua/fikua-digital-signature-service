@@ -187,6 +187,21 @@ Client                                  DSS
 - **Security headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security` and `Cache-Control: no-store` on every response.
 - **Graceful shutdown** (30 s phase) plus a global `@RestControllerAdvice` that maps known framework exceptions and unexpected errors to a typed `ErrorResponse`.
 
+## EU trusted lists
+
+A local copy of the EU List of Trusted Lists and the national lists (ETSI TS 119 612, `TrustedLists`), the base for validating certificates (fikua-docs ADR 0021). After the start a background thread loads the copy from `/var/lib/dss/trusted-lists` and then downloads what changed, every hour; the first full load takes a few minutes with 1 CPU. The LoTL signature is checked against the signers announced in the Official Journal (`src/main/resources/trust/eu-lotl-signers.p12`, public certificates from the EU DSS demonstrations, OJ C/2026/1944); a list with an invalid signature or expired is not trusted. `/health` reports `trustedLists` as `warn` while the copy is missing or older than 26 h.
+
+| Property | Default |
+| --- | --- |
+| `dss.trusted-lists.enabled` | `true` |
+| `dss.trusted-lists.lotl-url` | `https://ec.europa.eu/tools/lotl/eu-lotl.xml` |
+| `dss.trusted-lists.official-journal-url` | `https://eur-lex.europa.eu/eli/C/2026/1944/oj` |
+| `dss.trusted-lists.cache-directory` | `/var/lib/dss/trusted-lists` |
+| `dss.trusted-lists.refresh` | `PT1H` |
+| `dss.trusted-lists.max-age` | `PT26H` |
+
+When the Commission announces new LoTL signers in a new OJ publication, update the URL and the keystore (from the EU DSS demonstrations).
+
 ## OpenAPI / Swagger
 
 Off by default, so production never publishes them; set `SPRINGDOC_ENABLED=true` to turn them on locally.

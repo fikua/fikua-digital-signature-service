@@ -20,7 +20,9 @@ import org.springframework.test.context.TestPropertySource;
         "dss.tenants[0].certificate.cert-path=file:build/test-certs/mock-eseal.crt",
         "dss.tenants[0].certificate.key-path=file:build/test-certs/mock-eseal.key",
         "dss.token-ttl-seconds=3600",
-        "dss.sad-ttl-seconds=300"
+        "dss.sad-ttl-seconds=300",
+        // No downloads in tests: TrustedListsTest covers the trusted lists.
+        "dss.trusted-lists.enabled=false"
 })
 public abstract class IntegrationTestBase {
 }

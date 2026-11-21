@@ -33,7 +33,11 @@ RUN for v in $(env | sed -n 's/^\(OTEL_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done;
 FROM eclipse-temurin:25-jre-alpine
 # uid/gid 65532, the distroless "nonroot" every Fikua image runs as: the
 # platform writes secret files as root:65532 0640 (fikua-docs conv-deployment.md).
-RUN addgroup -S -g 65532 nonroot && adduser -S -u 65532 -G nonroot nonroot
+RUN addgroup -S -g 65532 nonroot && adduser -S -u 65532 -G nonroot nonroot \
+ && install -d -o nonroot -g nonroot -m 0750 /var/lib/dss/trusted-lists
+# The local copy of the EU trusted lists (TrustedLists); the deployment mounts a
+# volume here so a restart starts from it instead of downloading ~30 MB again.
+VOLUME /var/lib/dss/trusted-lists
 USER nonroot
 WORKDIR /app
 COPY --from=aot /app /app
@@ -44,4 +48,7 @@ EXPOSE 9090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=2s --retries=3 \
     CMD wget -q -O /dev/null "http://127.0.0.1:${SERVER_PORT:-9090}/health" || exit 1
 # A JVM that does not match the cache ignores it with a warning and starts as before.
-ENTRYPOINT ["java", "-XX:AOTCache=/app/dss.aot", "-jar", "/app/dss.jar"]
+# Heap: 60 % of the container limit (the JVM default is 25 %). With the EU
+# trusted lists ~145 MB stay live and a refresh peaks near 360 MB; outside the
+# heap the JVM takes ~130 MB more. Sized for a 640 MB limit.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60", "-XX:AOTCache=/app/dss.aot", "-jar", "/app/dss.jar"]
