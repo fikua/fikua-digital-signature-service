@@ -53,7 +53,8 @@ v1 has no `signDoc` endpoint — it is not defined by the 1.0.3.0 spec.
 
 Signing uses the European Commission's DSS libraries (`dss-token`, `dss-jades`, `dss-cades`).
 
-- **signHash**: the credential's key signs the client's digest (`SignatureTokenConnection.signDigest`). `hashAlgorithmOID` (v2) or `hashAlgo` (v1) selects SHA-256, SHA-384 or SHA-512 (SHA-256 when absent); the hash length must match. ECDSA signatures are ASN.1 DER, RSA ones PKCS#1 v1.5, as before.
+- **ES256 only** (ECDSA P-256 with SHA-256, the algorithm HAIP requires): every credential's key must be EC P-256, or the service does not start.
+- **signHash**: the credential's key signs the client's SHA-256 digest (`SignatureTokenConnection.signDigest`); the signature is ASN.1 DER. `hashAlgorithmOID` (v2) or `hashAlgo` (v1) must be SHA-256 (`2.16.840.1.101.3.4.2.1`) or absent; anything else, or a hash that is not 32 bytes, answers 400.
 - **signDoc**, `documents` mode: `signature_format` `J` returns an enveloping JAdES-B-B (compact JWS) in `DocumentWithSignature`; `C` a detached CAdES-B-B in `SignatureObject`. Only `AdES-B-B` is produced (no timestamps). Without `signature_format`, the raw signature of the document in both fields (the pre-0.7.0 behaviour). `P` and `X` answer 400.
 - **signDoc**, `documentDigests` mode: signed as in signHash.
 

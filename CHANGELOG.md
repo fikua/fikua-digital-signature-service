@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.1] - 2026-11-21
+
+### Changed
+- **ES256 only** (ECDSA P-256 with SHA-256, RFC 7518 §3.4; required by HAIP):
+  a credential whose key is not EC P-256 stops the start; signHash refuses any
+  `hashAlgorithmOID` / `hashAlgo` other than SHA-256 with 400 `invalid_request`.
+  `credentials/info` announces ecdsa-with-SHA256 and 256 bits. The RSA paths are
+  gone.
+
 ## [0.7.0] - 2026-11-21
 
 ### Changed

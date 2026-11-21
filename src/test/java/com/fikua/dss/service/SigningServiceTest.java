@@ -37,9 +37,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Signatures made with the EU DSS libraries: signHash keeps the format clients
- * verify today (ECDSA in DER, RSA PKCS#1 v1.5), and signDoc's JAdES and CAdES
- * signatures pass DSS's own validation.
+ * Signatures made with the EU DSS libraries, ES256 only: signHash keeps the
+ * format clients verify today (ECDSA in DER), anything that is not P-256 with
+ * SHA-256 is refused, and signDoc's JAdES and CAdES signatures pass DSS's own
+ * validation.
  */
 class SigningServiceTest {
 
@@ -49,6 +50,7 @@ class SigningServiceTest {
 
     private static TenantMaterial ec;
     private static TenantMaterial rsa;
+    private static TenantMaterial p384;
 
     private final SigningService service = new SigningService();
 
@@ -57,6 +59,7 @@ class SigningServiceTest {
         Security.addProvider(new BouncyCastleProvider());
         ec = credential("ec", "EC", 256, "SHA256withECDSA");
         rsa = credential("rsa", "RSA", 2048, "SHA256withRSA");
+        p384 = credential("p384", "EC", 384, "SHA384withECDSA");
     }
 
     @Test
@@ -66,15 +69,16 @@ class SigningServiceTest {
     }
 
     @Test
-    void signHashRsaIsPkcs1AndVerifies() throws Exception {
-        var signature = signHash(rsa, "SHA-256", SHA256);
-        assertTrue(verify("SHA256withRSA", rsa, signature), "RSA PKCS#1 v1.5 signature verifies");
+    void keysOtherThanP256AreRefused() throws Exception {
+        var hashes = List.of(b64url(MessageDigest.getInstance("SHA-256").digest(DATA)));
+        assertThrows(IllegalStateException.class, () -> service.signHashes(hashes, SHA256, rsa));
+        assertThrows(IllegalStateException.class, () -> service.signHashes(hashes, SHA256, p384));
     }
 
     @Test
-    void signHashFollowsTheHashAlgorithm() throws Exception {
-        var signature = signHash(ec, "SHA-384", SHA384);
-        assertTrue(verify("SHA384withECDSA", ec, signature));
+    void hashAlgorithmsOtherThanSha256AreRefused() throws Exception {
+        var hashes = List.of(b64url(MessageDigest.getInstance("SHA-384").digest(DATA)));
+        assertThrows(InvalidRequestException.class, () -> service.signHashes(hashes, SHA384, ec));
     }
 
     @Test
@@ -108,7 +112,7 @@ class SigningServiceTest {
 
     @Test
     void signDocCadesIsAValidDetachedCadesBaselineB() {
-        var signed = service.signDocument(DATA, "C", null, rsa);
+        var signed = service.signDocument(DATA, "C", null, ec);
 
         assertNull(signed.documentWithSignature());
         assertNotNull(signed.signatureObject());

@@ -45,6 +45,8 @@ public class CertificateService {
         }
         for (var tenant : properties.tenants()) {
             var certChain = loadCertificate(tenant.certificate().certPath());
+            // ES256 only: a credential whose key is not EC P-256 stops the start.
+            Es256.requireP256(certChain.getFirst());
             var privateKey = loadPrivateKey(tenant.certificate().keyPath(), certChain);
             var material = new TenantMaterial(tenant, certChain, toBase64(certChain), privateKey);
 
@@ -122,8 +124,6 @@ public class CertificateService {
                     .replace("-----END PRIVATE KEY-----", "")
                     .replace("-----BEGIN EC PRIVATE KEY-----", "")
                     .replace("-----END EC PRIVATE KEY-----", "")
-                    .replace("-----BEGIN RSA PRIVATE KEY-----", "")
-                    .replace("-----END RSA PRIVATE KEY-----", "")
                     .replaceAll("\\s", "");
             var keyBytes = Base64.getDecoder().decode(keyBase64);
             var keySpec = new PKCS8EncodedKeySpec(keyBytes);
@@ -141,31 +141,13 @@ public class CertificateService {
             List<String> certificateChainBase64,
             PrivateKey privateKey
     ) {
+        /** The signature algorithm credentials/info announces: ecdsa-with-SHA256 (ES256). */
         public String getKeyAlgorithmOid() {
-            var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
-            return switch (algo) {
-                case "EC" -> "1.2.840.10045.4.3.2";
-                case "RSA" -> "1.2.840.113549.1.1.11";
-                default -> throw new IllegalStateException("Unsupported key algorithm: " + algo);
-            };
+            return Es256.SIGNATURE_OID;
         }
 
         public int getKeyLength() {
-            var algo = certificateChain.getFirst().getPublicKey().getAlgorithm();
-            return switch (algo) {
-                case "EC" -> 256;
-                case "RSA" -> 2048;
-                default -> 256;
-            };
-        }
-
-        public String getSignatureAlgorithm() {
-            var algo = privateKey.getAlgorithm();
-            return switch (algo) {
-                case "EC" -> "SHA256withECDSA";
-                case "RSA" -> "SHA256withRSA";
-                default -> throw new IllegalStateException("Unsupported algorithm: " + algo);
-            };
+            return Es256.KEY_LENGTH;
         }
     }
 }
