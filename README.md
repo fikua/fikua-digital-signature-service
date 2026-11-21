@@ -171,10 +171,10 @@ Client                                  DSS
 
 ## Production readiness
 
-- **Health probes** at `/health`, `/health/liveness`, `/health/readiness` via Spring Boot Actuator. A custom `certificate` component reports DOWN when the cert is expired, not yet valid, or the private key is missing.
+- **Health** at `GET /health` in `application/health+json` (fikua-docs OBS-17), statuses only. The Actuator, with its details, is on the internal management port 9091. A custom `certificate` component reports DOWN when a certificate is expired, not yet valid, or its private key is missing.
 - **Structured logging**: `logstash-logback-encoder` emits JSON in production and a human-readable line in `local` / `dev` profiles. Bootstrap noise from autoconfigure, Tomcat, OpenTelemetry and Springdoc is demoted to WARN; the Spring banner is off.
 - **Correlation**: every response carries an `X-Request-Id` header (honours an incoming one or generates a UUID). The same id is in the MDC alongside OTEL `trace_id` / `span_id`.
-- **OpenTelemetry**: `opentelemetry-spring-boot-starter` is wired in. Exporters default to `none`; set `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_TRACES_EXPORTER=otlp` (etc.) to enable.
+- **OpenTelemetry** (fikua-docs conv-observability.md): the OpenTelemetry Spring Boot starter exports traces, metrics and logs over OTLP/HTTP with semantic-convention names. Exporters default to `none`; the deployment sets `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_{TRACES,METRICS,LOGS}_EXPORTER=otlp`. `service.version` is the build's version (build-info). Log values are SLF4J key-value pairs (`log.atWarn().addKeyValue(...)`): each one becomes a log attribute. Audit events and the `dss.business.operations` counter: `AuditEvents`.
 - **Security headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security` and `Cache-Control: no-store` on every response.
 - **Graceful shutdown** (30 s phase) plus a global `@RestControllerAdvice` that maps known framework exceptions and unexpected errors to a typed `ErrorResponse`.
 
@@ -185,18 +185,19 @@ Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive 
 ## Tech stack
 
 - Java 25 (Gradle toolchain)
-- Spring Boot 3.4.4 + Spring Boot Actuator
-- BouncyCastle 1.80 (signing primitives)
-- Nimbus JOSE+JWT 9.40 (token signing)
-- springdoc-openapi 2.7.0 (OpenAPI + Swagger UI)
-- OpenTelemetry Java instrumentation 2.10.0
-- Logback + logstash-logback-encoder 8.0 (JSON logs)
+- Spring Boot 4.2 + Spring Boot Actuator
+- BouncyCastle 1.87 (signing primitives)
+- Nimbus JOSE+JWT 10.10 (token signing)
+- springdoc-openapi 3.2 (OpenAPI + Swagger UI)
+- OpenTelemetry Java instrumentation 2.34 (Spring Boot starter)
+- Logback + logstash-logback-encoder 9.0 (JSON logs)
 
 ## Releases
 
 - **Image:** `ghcr.io/fikua/fikua-digital-signature-service` (also on Docker Hub until ADR 0015 closes it).
 - **CI:** `.github/workflows/ci.yml` (shared workflows) publishes `latest` and `sha-<short>` on every push to `main`, and `X.Y.Z` on every `vX.Y.Z` tag.
-- **Deploy:** not from this repository. `fikua-platform-iac/projects/fikua-lab/dss/compose.yaml` pins a release and Dependabot proposes each new one (fikua-docs ADR 0019).
+- **Version:** `version` in `build.gradle` is the release; bump it in the pull request, then tag `v<version>`. The build fails on a tag that does not match.
+- **Deploy:** not from this repository. `fikua-platform-iac/projects/fikua-digital-signature-service/compose.yaml` pins a release and Dependabot proposes each new one (fikua-docs ADR 0019).
 - Multi-arch: `linux/amd64` + `linux/arm64`.
 
 ## Contributing

@@ -54,11 +54,13 @@ public class CertificateService {
             if (tenantsByCredentialId.putIfAbsent(tenant.credentialId(), material) != null) {
                 throw new IllegalStateException("Duplicate tenant credential-id: " + tenant.credentialId());
             }
-            log.info("Certificate loaded for tenant clientId={}: subject={}, issuer={}, algo={}",
-                    tenant.clientId(),
-                    certChain.getFirst().getSubjectX500Principal(),
-                    certChain.getFirst().getIssuerX500Principal(),
-                    privateKey.getAlgorithm());
+            // No subject: once credentials hold personal certificates it is a name (OBS-05).
+            log.atInfo().setMessage("credential certificate loaded")
+                    .addKeyValue("credential.id", tenant.credentialId())
+                    .addKeyValue("certificate.issuer", certChain.getFirst().getIssuerX500Principal().getName())
+                    .addKeyValue("certificate.not_after", certChain.getFirst().getNotAfter().toInstant().toString())
+                    .addKeyValue("key.algorithm", privateKey.getAlgorithm())
+                    .log();
         }
     }
 

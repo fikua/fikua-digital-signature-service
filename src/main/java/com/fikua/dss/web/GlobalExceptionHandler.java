@@ -4,7 +4,6 @@ import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -24,13 +23,17 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String INVALID_REQUEST = "invalid_request";
+    static final String ERROR_TYPE = "error.type";
+    static final String ERROR_MESSAGE = "error.message";
+    /** OBS-08: error.message is cut at 280 characters. */
+    static final int MAX_ERROR_MESSAGE = 280;
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e) {
-        if (log.isWarnEnabled()) {
-            log.warn("Malformed request body: {}",
-                    LogSanitizer.clean(e.getMostSpecificCause().getMessage()));
-        }
+        // The parser's message quotes the body, so it is not logged (OBS-05).
+        log.atWarn().setMessage("malformed request body")
+                .addKeyValue(ERROR_TYPE, INVALID_REQUEST)
+                .log();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(INVALID_REQUEST, "Malformed request body"));
     }
@@ -38,9 +41,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e) {
         var safeName = LogSanitizer.clean(e.getParameterName());
-        if (log.isWarnEnabled()) {
-            log.warn("Missing required parameter: {}", safeName);
-        }
+        log.atWarn().setMessage("missing request parameter")
+                .addKeyValue(ERROR_TYPE, INVALID_REQUEST)
+                .addKeyValue("parameter", safeName)
+                .log();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(INVALID_REQUEST,
                         "Missing required parameter: " + safeName));
@@ -49,9 +53,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
         var safeName = LogSanitizer.clean(e.getHeaderName());
-        if (log.isWarnEnabled()) {
-            log.warn("Missing required header: {}", safeName);
-        }
+        log.atWarn().setMessage("missing request header")
+                .addKeyValue(ERROR_TYPE, INVALID_REQUEST)
+                .addKeyValue("header", safeName)
+                .log();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(INVALID_REQUEST,
                         "Missing required header: " + safeName));
@@ -73,23 +78,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ErrorResponse> handleSecurity(SecurityException e) {
-        if (log.isWarnEnabled()) {
-            log.warn("Security violation: {}", LogSanitizer.clean(e.getMessage()));
-        }
+        log.atWarn().setMessage("client refused")
+                .addKeyValue(ERROR_TYPE, "invalid_client")
+                .addKeyValue(ERROR_MESSAGE, errorMessage(e))
+                .log();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("invalid_client", e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception e) {
-        // error.type and exception.type travel as MDC attributes, so the log
-        // record and the metrics join on the same stable code (fikua-docs
-        // observability convention, OBS-08).
-        try (var errorType = MDC.putCloseable("error.type", "server_error");
-             var exceptionType = MDC.putCloseable("exception.type", e.getClass().getSimpleName())) {
-            log.error("Unhandled error", e);
-        }
+        // error.type is the stable code the metrics use too, so a log record and
+        // its metric join on one key (fikua-docs conv-observability.md, OBS-08).
+        log.atError().setMessage("unhandled error")
+                .addKeyValue(ERROR_TYPE, "server_error")
+                .addKeyValue("exception.type", e.getClass().getSimpleName())
+                .addKeyValue(ERROR_MESSAGE, errorMessage(e))
+                .setCause(e)
+                .log();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("server_error", "Internal server error"));
+    }
+
+    static String errorMessage(Throwable e) {
+        // Control characters out (CWE-117), as LogSanitizer does, with OBS-08's length.
+        var message = e.getMessage() == null ? "" : e.getMessage().replaceAll("\\p{Cntrl}", "_");
+        return message.length() > MAX_ERROR_MESSAGE ? message.substring(0, MAX_ERROR_MESSAGE) : message;
     }
 }

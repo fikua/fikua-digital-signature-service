@@ -2,9 +2,6 @@ package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.TenantProperties;
-import com.fikua.dss.util.LogSanitizer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -12,12 +9,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static net.logstash.logback.argument.StructuredArguments.kv;
-
 @Service
 public class TokenService {
-
-    private static final Logger log = LoggerFactory.getLogger(TokenService.class);
 
     private final DssProperties properties;
     private final Map<String, TokenEntry> activeTokens = new ConcurrentHashMap<>();
@@ -35,9 +28,6 @@ public class TokenService {
         var token = UUID.randomUUID().toString();
         var expiry = Instant.now().plusSeconds(properties.tokenTtlSeconds());
         activeTokens.put(token, new TokenEntry(tenant.clientId(), expiry));
-        log.info("Issued access token for tenant {}, expires at {}",
-                LogSanitizer.clean(tenant.clientId()), expiry,
-                kv("event", "token.authorized"), kv("result", "success"));
         return token;
     }
 
@@ -70,13 +60,6 @@ public class TokenService {
         var sad = UUID.randomUUID().toString();
         var expiry = Instant.now().plusSeconds(properties.sadTtlSeconds());
         activeSads.put(sad, new SadEntry(tenantClientId, credentialId, expiry));
-        if (log.isInfoEnabled()) {
-            log.info("Issued SAD for credential {}, expires at {}",
-                    LogSanitizer.clean(credentialId), expiry,
-                    kv("event", "credential.authorized"),
-                    kv("credential_id", credentialId),
-                    kv("result", "success"));
-        }
         return sad;
     }
 

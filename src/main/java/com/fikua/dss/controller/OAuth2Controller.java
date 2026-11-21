@@ -6,9 +6,6 @@ import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.dto.common.TokenResponse;
 import com.fikua.dss.service.TokenService;
-import com.fikua.dss.util.LogSanitizer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,8 +15,6 @@ import java.util.Base64;
 
 @RestController
 public class OAuth2Controller {
-
-    private static final Logger log = LoggerFactory.getLogger(OAuth2Controller.class);
 
     private final TokenService tokenService;
     private final DssProperties properties;
@@ -38,10 +33,6 @@ public class OAuth2Controller {
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "authorization_details", required = false) String authorizationDetails
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /oauth2/token grant_type={} scope={}",
-                    LogSanitizer.clean(grantType), LogSanitizer.clean(scope));
-        }
 
         if (!"client_credentials".equals(grantType)) {
             return ResponseEntity.badRequest().body(

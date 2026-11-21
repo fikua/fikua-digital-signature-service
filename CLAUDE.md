@@ -25,7 +25,7 @@ or sign with another tenant's certificate. See `CertificateService`
 ## Tech stack
 
 - **Java 25** (Gradle toolchain)
-- **Spring Boot 3.4.4**
+- **Spring Boot 4.2**
 - Small, self-contained service
 
 ## Architecture
