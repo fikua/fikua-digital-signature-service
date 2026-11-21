@@ -20,7 +20,11 @@ WORKDIR /app
 COPY --from=build /workspace/build/libs/*.jar /tmp/dss.jar
 RUN java -Djarmode=tools -jar /tmp/dss.jar extract --destination /app && rm /tmp/dss.jar
 COPY --from=build /training /training
-RUN DSS_TENANTS_0_CLIENT_ID=training DSS_TENANTS_0_CLIENT_SECRET=training \
+# BuildKit traces build steps through OTEL_* variables pointing to its own
+# unix socket, which the OpenTelemetry starter refuses: the training run starts
+# without any of them (the application's exporters then default to none).
+RUN for v in $(env | sed -n 's/^\(OTEL_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done; \
+    DSS_TENANTS_0_CLIENT_ID=training DSS_TENANTS_0_CLIENT_SECRET=training \
     DSS_TENANTS_0_CREDENTIAL_ID=training DSS_TENANTS_0_CREDENTIAL_PASSWORD=training \
     DSS_TENANTS_0_CERTIFICATE_CERT_PATH=file:/training/cert.pem \
     DSS_TENANTS_0_CERTIFICATE_KEY_PATH=file:/training/key.pem \
