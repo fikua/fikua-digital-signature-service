@@ -88,7 +88,7 @@ tasks.named('jacocoTestReport') {
 group = 'com.fikua'
 // The release version: the v<version> tag must match it (checked below), and it
 // becomes the jar's version and the telemetry's service.version (build-info).
-version = '0.6.1'
+version = '0.7.0'
 
 java {
     toolchain {
@@ -110,6 +110,13 @@ dependencies {
     // (fikua-docs conv-observability.md, OBS-02, OBS-10).
     implementation platform('io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.34.0')
     implementation 'io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter'
+    // EU DSS (European Commission): signatures and, later, trust lists.
+    implementation platform('eu.europa.ec.joinup.sd-dss:dss-bom:6.5.1')
+    implementation 'eu.europa.ec.joinup.sd-dss:dss-token'
+    implementation 'eu.europa.ec.joinup.sd-dss:dss-jades'
+    implementation 'eu.europa.ec.joinup.sd-dss:dss-cades'
+    implementation 'eu.europa.ec.joinup.sd-dss:dss-cms-object'
+    implementation 'eu.europa.ec.joinup.sd-dss:dss-utils-apache-commons'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.87'
     implementation 'org.bouncycastle:bcpkix-jdk18on:1.87'
     implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
@@ -117,6 +124,9 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'io.opentelemetry:opentelemetry-sdk-testing'
+    // Validates the signatures the tests produce, with the default policy.
+    testImplementation 'eu.europa.ec.joinup.sd-dss:dss-validation'
+    testImplementation 'eu.europa.ec.joinup.sd-dss:dss-policy-jaxb'
 }
 
 springBoot {

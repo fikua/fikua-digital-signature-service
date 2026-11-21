@@ -76,6 +76,16 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("not_found", "No handler for requested resource"));
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException e) {
+        log.atWarn().setMessage("request refused")
+                .addKeyValue(ERROR_TYPE, INVALID_REQUEST)
+                .addKeyValue(ERROR_MESSAGE, e.getMessage())
+                .log();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(INVALID_REQUEST, e.getMessage()));
+    }
+
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ErrorResponse> handleSecurity(SecurityException e) {
         log.atWarn().setMessage("client refused")

@@ -193,20 +193,47 @@ class CscV2ControllerTest extends IntegrationTestBase {
     // -- /csc/v2/signatures/signDoc ----------------------------------------------
 
     @Test
-    void signDocAcceptsDocumentsModeAndReturnsSignatureObjectField() throws Exception {
-        var docB64 = Base64.getEncoder().encodeToString("a tiny document".getBytes());
-        var sad = issueSad();
-        var req = new SignDocRequest("mock-credential-001", "eu_eidas_qes", sad,
-                null,
-                List.of(new Document(docB64, "P", "Ades-B-B", null, null)),
-                "2.16.840.1.101.3.4.2.1", null, null, null, null, null);
-        mockMvc.perform(post("/csc/v2/signatures/signDoc")
-                        .header("Authorization", bearer())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(req)))
+    void signDocJadesReturnsTheSignedDocument() throws Exception {
+        mockMvc.perform(signDoc("J"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.DocumentWithSignature").isArray())
+                .andExpect(jsonPath("$.DocumentWithSignature[0]").exists())
+                .andExpect(jsonPath("$.SignatureObject").doesNotExist());
+    }
+
+    @Test
+    void signDocCadesReturnsTheDetachedSignature() throws Exception {
+        mockMvc.perform(signDoc("C"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.SignatureObject[0]").exists())
+                .andExpect(jsonPath("$.DocumentWithSignature").doesNotExist());
+    }
+
+    @Test
+    void signDocWithoutFormatKeepsBothFields() throws Exception {
+        mockMvc.perform(signDoc(null))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.DocumentWithSignature").isArray())
                 .andExpect(jsonPath("$.SignatureObject").isArray());
+    }
+
+    @Test
+    void signDocRefusesAnUnsupportedFormat() throws Exception {
+        mockMvc.perform(signDoc("P"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_request"));
+    }
+
+    private org.springframework.test.web.servlet.RequestBuilder signDoc(String format) throws Exception {
+        var docB64 = Base64.getEncoder().encodeToString("a tiny document".getBytes());
+        var req = new SignDocRequest("mock-credential-001", "eu_eidas_qes", issueSad(),
+                null,
+                List.of(new Document(docB64, format, "AdES-B-B", null, null)),
+                "2.16.840.1.101.3.4.2.1", null, null, null, null, null);
+        return post("/csc/v2/signatures/signDoc")
+                .header("Authorization", bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(req));
     }
 
     @Test

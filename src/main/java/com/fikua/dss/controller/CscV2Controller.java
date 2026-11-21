@@ -19,6 +19,7 @@ import com.fikua.dss.dto.v2.SignHashRequest;
 import com.fikua.dss.dto.v2.SignHashResponse;
 import com.fikua.dss.service.CertificateService;
 import com.fikua.dss.service.SigningService;
+import com.fikua.dss.web.InvalidRequestException;
 import com.fikua.dss.service.TokenService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -202,7 +203,7 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_request", "Missing hashes in request"));
         }
 
-        var signatures = signingService.signHashes(request.hashes(), tenantResult.tenant());
+        var signatures = signingService.signHashes(request.hashes(), request.hashAlgorithmOID(), tenantResult.tenant());
         audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignHashResponse(signatures, null));
     }
@@ -221,17 +222,22 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
 
-        // CSC v2 supports two input modes: documents (full doc to sign) or documentDigests (precomputed hashes).
-        // Mock implements documents mode (current Issuer behaviour); documentDigests mode would also be valid.
+        // CSC v2 input modes: documents (the service builds the AdES signature,
+        // SigningService) or documentDigests (precomputed hashes, signed as in signHash).
         if (request.documents() != null && !request.documents().isEmpty()) {
-            var docs = request.documents().stream()
-                    .map(doc -> Base64.getDecoder().decode(doc.document()))
-                    .toList();
-            var signatures = signingService.signDocuments(docs, tenantResult.tenant());
-
-            var signedDocs = new ArrayList<>(signatures);
-            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signedDocs.size(), "v2");
-            return ResponseEntity.ok(new SignDocResponse(signedDocs, signatures, null, null));
+            var withSignature = new ArrayList<String>();
+            var signatureObjects = new ArrayList<String>();
+            for (var doc : request.documents()) {
+                var signed = signingService.signDocument(decodeDocument(doc.document()),
+                        doc.signature_format(), doc.conformance_level(), tenantResult.tenant());
+                if (signed.documentWithSignature() != null) withSignature.add(signed.documentWithSignature());
+                if (signed.signatureObject() != null) signatureObjects.add(signed.signatureObject());
+            }
+            audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(),
+                    request.documents().size(), "v2");
+            return ResponseEntity.ok(new SignDocResponse(
+                    withSignature.isEmpty() ? null : withSignature,
+                    signatureObjects.isEmpty() ? null : signatureObjects, null, null));
         }
 
         if (request.documentDigests() != null && !request.documentDigests().isEmpty()) {
@@ -239,13 +245,21 @@ public class CscV2Controller {
             for (var dd : request.documentDigests()) {
                 if (dd.hashes() != null) allHashes.addAll(dd.hashes());
             }
-            var signatures = signingService.signHashes(allHashes, tenantResult.tenant());
+            var signatures = signingService.signHashes(allHashes, request.hashAlgorithmOID(), tenantResult.tenant());
             audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
             return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
         }
 
         return ResponseEntity.badRequest().body(
                 new ErrorResponse("invalid_request", "Either 'documents' or 'documentDigests' must be provided"));
+    }
+
+    private static byte[] decodeDocument(String documentBase64) {
+        try {
+            return Base64.getDecoder().decode(documentBase64);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new InvalidRequestException("Document is not base64");
+        }
     }
 
     private TenantResolution resolveTenant(String authHeader) {
