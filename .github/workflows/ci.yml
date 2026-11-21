@@ -23,7 +23,9 @@ jobs:
     with:
       # build runs the tests; jacocoTestReport writes the XML report Sonar reads.
       gradle-tasks: build jacocoTestReport
-      sonar: ${{ github.ref_type != 'tag' && github.event_name != 'workflow_dispatch' }}
+      # Dependabot runs get no Actions secrets (SONAR_TOKEN); its pull requests
+      # are built and tested, and Sonar analyses main once they are merged.
+      sonar: ${{ github.ref_type != 'tag' && github.event_name != 'workflow_dispatch' && github.actor != 'dependabot[bot]' }}
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
