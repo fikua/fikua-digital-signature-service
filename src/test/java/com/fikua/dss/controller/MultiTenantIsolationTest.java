@@ -45,7 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "dss.tenants[1].certificate.cert-path=file:build/test-certs/tenant-b-eseal.crt",
         "dss.tenants[1].certificate.key-path=file:build/test-certs/tenant-b-eseal.key",
         "dss.token-ttl-seconds=3600",
-        "dss.sad-ttl-seconds=300"
+        "dss.sad-ttl-seconds=300",
+        "dss.trusted-lists.enabled=false"
 })
 class MultiTenantIsolationTest {
 

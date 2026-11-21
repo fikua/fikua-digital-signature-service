@@ -14,6 +14,8 @@ certs/
 *.key
 *.crt
 *.p12
+# Public certificates the service trusts (TrustedLists)
+!src/main/resources/trust/*.p12
 *.pfx
 *.jks
 
