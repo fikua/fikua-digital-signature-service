@@ -173,7 +173,7 @@ public class CscV1Controller {
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
 
-        var signatures = signingService.signHashes(request.hash(), tenantResult.tenant());
+        var signatures = signingService.signHashes(request.hash(), request.hashAlgo(), tenantResult.tenant());
         audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v1");
         return ResponseEntity.ok(new SignHashResponse(signatures));
     }

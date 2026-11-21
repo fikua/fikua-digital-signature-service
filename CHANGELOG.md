@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-11-21
+
+### Changed
+- **Signing with the EU DSS libraries 6.5.1** (`dss-token`, `dss-jades`,
+  `dss-cades`) instead of hand-written JCA code.
+- **signHash** follows `hashAlgorithmOID` / `hashAlgo` (SHA-256, -384, -512;
+  SHA-256 when absent) and refuses a hash of the wrong length. Output format
+  unchanged: ECDSA in DER, RSA PKCS#1 v1.5.
+- **signDoc** produces AdES baseline B: `J` → enveloping JAdES (compact JWS) in
+  `DocumentWithSignature`; `C` → detached CAdES in `SignatureObject`. Without
+  `signature_format`, the raw signature as before. `P`, `X` and levels above
+  B-B answer 400 `invalid_request`.
+
 ## [0.6.1] - 2026-11-21
 
 ### Security

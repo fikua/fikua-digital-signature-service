@@ -36,7 +36,7 @@ v1 has no `signDoc` endpoint — it is not defined by the 1.0.3.0 spec.
 | POST   | `/csc/v2/credentials/info`      | Credential and certificate info (`auth` object) |
 | POST   | `/csc/v2/credentials/authorize` | Get SAD using `authData: [{id, value}]` array |
 | POST   | `/csc/v2/signatures/signHash`   | Sign pre-computed hash(es) (`hashes` + `hashAlgorithmOID`) |
-| POST   | `/csc/v2/signatures/signDoc`    | Sign document(s) — v2 only                 |
+| POST   | `/csc/v2/signatures/signDoc`    | Sign document(s) — v2 only: JAdES (`J`) or CAdES (`C`), baseline B |
 
 ### CSC v1 vs v2 contract divergences
 
@@ -48,6 +48,14 @@ v1 has no `signDoc` endpoint — it is not defined by the 1.0.3.0 spec.
 | `credentials/info` response auth model      | `authMode` + `PIN` + `OTP` + `multisign` + `lang` | `auth: {mode, expression, objects[]}` object  |
 | `info` HTTP method                          | `GET ?lang=`                                      | `POST` body                                   |
 | `signatures/signDoc` endpoint               | Not defined                                       | Defined (supports `documents` or `documentDigests`) |
+
+### Signatures (EU DSS 6.5)
+
+Signing uses the European Commission's DSS libraries (`dss-token`, `dss-jades`, `dss-cades`).
+
+- **signHash**: the credential's key signs the client's digest (`SignatureTokenConnection.signDigest`). `hashAlgorithmOID` (v2) or `hashAlgo` (v1) selects SHA-256, SHA-384 or SHA-512 (SHA-256 when absent); the hash length must match. ECDSA signatures are ASN.1 DER, RSA ones PKCS#1 v1.5, as before.
+- **signDoc**, `documents` mode: `signature_format` `J` returns an enveloping JAdES-B-B (compact JWS) in `DocumentWithSignature`; `C` a detached CAdES-B-B in `SignatureObject`. Only `AdES-B-B` is produced (no timestamps). Without `signature_format`, the raw signature of the document in both fields (the pre-0.7.0 behaviour). `P` and `X` answer 400.
+- **signDoc**, `documentDigests` mode: signed as in signHash.
 
 The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.json`](csc_openapi_1.0.3.0.json) and [`csc_openapi_2.1.0.1.yaml`](csc_openapi_2.1.0.1.yaml). The published v2.1.0.1 spec has internal inconsistencies between `required` lists and `properties` blocks (e.g. `input-signatures-signhash.required` lists `hash` but `properties` only defines `hashes`); this implementation follows `properties` consistently. See [`TD-ISSUER-CSC-V2-CONFORMANCE.md`](TD-ISSUER-CSC-V2-CONFORMANCE.md) for the Issuer-side migration plan to conformant v1/v2 request bodies.
 
@@ -187,7 +195,8 @@ Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive 
 
 - Java 25 (Gradle toolchain)
 - Spring Boot 4.2 + Spring Boot Actuator
-- BouncyCastle 1.87 (signing primitives)
+- EU DSS 6.5.1 (signatures: token, JAdES, CAdES)
+- BouncyCastle 1.87 (key loading, through DSS)
 - Nimbus JOSE+JWT 10.10 (token signing)
 - springdoc-openapi 3.2 (OpenAPI + Swagger UI)
 - OpenTelemetry Java instrumentation 2.34 (Spring Boot starter)
