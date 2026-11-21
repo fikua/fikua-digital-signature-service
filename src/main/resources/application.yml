@@ -81,10 +81,14 @@ info:
     description: Fikua Digital Signature Service (CSC v2 mock QTSP)
 
 # OpenAPI / Swagger UI
+# Off unless SPRINGDOC_ENABLED=true (local development): in production the
+# spec and the UI would publish the whole API to anyone.
 springdoc:
   api-docs:
+    enabled: ${SPRINGDOC_ENABLED:false}
     path: /v3/api-docs
   swagger-ui:
+    enabled: ${SPRINGDOC_ENABLED:false}
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
@@ -104,12 +108,16 @@ otel:
   logs:
     exporter: ${OTEL_LOGS_EXPORTER:none}
   instrumentation:
-    logback-appender:
-      experimental:
+    common:
+      logging:
         # Values travel as SLF4J key-value pairs (log.atInfo().addKeyValue(...)):
         # each one becomes a log attribute, a column in OpenObserve (OBS-08).
-        capture-key-value-pair-attributes: true
-        capture-mdc-attributes: request_id
+        structured-attributes:
+          included: "*"
+    logback-appender:
+      experimental:
+        mdc-attributes:
+          included: request_id
 
 logging:
   level:
