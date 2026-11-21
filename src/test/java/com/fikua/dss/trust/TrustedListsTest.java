@@ -68,6 +68,19 @@ class TrustedListsTest {
         assertFalse(lists.state().fresh());
     }
 
+    @Test
+    void startRefreshesInTheBackgroundAndStopEndsIt(@TempDir Path cache) throws Exception {
+        var lists = new TrustedLists(properties(cache), Clock.fixed(NOW, ZoneOffset.UTC), new Offline());
+
+        lists.start();
+        for (int i = 0; i < 100 && lists.state().lastRefresh() == null; i++) {
+            Thread.sleep(50);
+        }
+        lists.stop();
+
+        assertEquals(NOW, lists.state().lastRefresh(), "the first refresh ran on the background thread");
+    }
+
     private static TrustedListProperties properties(Path cache) {
         return new TrustedListProperties(true, "https://example.invalid/lotl.xml",
                 "https://example.invalid/oj", cache.toString(), Duration.ofHours(1), Duration.ofHours(26));
