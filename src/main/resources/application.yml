@@ -38,14 +38,15 @@ dss:
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}
 
-# Actuator: serve probes at root paths and expose health + info publicly.
+# Actuator on an internal management port (Traefik routes only the server
+# port): its health details name tenants and certificates. The public
+# GET /health is HealthController, in the OBS-17 format, statuses only.
 management:
+  server:
+    port: ${MANAGEMENT_PORT:9091}
   endpoints:
     web:
-      base-path: /
-      path-mapping:
-        health: health
-        info: info
+      base-path: /actuator
       exposure:
         include: health,info
   endpoint:
