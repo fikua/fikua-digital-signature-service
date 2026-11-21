@@ -1,7 +1,5 @@
 package com.fikua.dss.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.PrivateKey;
@@ -12,8 +10,6 @@ import java.util.List;
 
 @Service
 public class SigningService {
-
-    private static final Logger log = LoggerFactory.getLogger(SigningService.class);
 
     // DigestInfo prefix for SHA-256 (DER-encoded ASN.1: SEQUENCE { SEQUENCE { OID sha256, NULL }, OCTET STRING })
     private static final byte[] SHA256_DIGEST_INFO_PREFIX = {
@@ -29,7 +25,6 @@ public class SigningService {
             var signatureBytes = rawSign(hashBytes, tenant.privateKey());
             signatures.add(Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes));
         }
-        log.info("Signed {} hash(es)", hashesBase64.size());
         return signatures;
     }
 
@@ -39,7 +34,6 @@ public class SigningService {
             var signatureBytes = signWithDigest(doc, tenant);
             signatures.add(Base64.getEncoder().encodeToString(signatureBytes));
         }
-        log.info("Signed {} document(s)", documents.size());
         return signatures;
     }
 

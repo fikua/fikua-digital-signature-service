@@ -15,9 +15,6 @@ import com.fikua.dss.dto.v1.SignHashResponse;
 import com.fikua.dss.service.CertificateService;
 import com.fikua.dss.service.SigningService;
 import com.fikua.dss.service.TokenService;
-import com.fikua.dss.util.LogSanitizer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,8 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.TimeZone;
-
-import static net.logstash.logback.argument.StructuredArguments.kv;
 
 /**
  * CSC API v1 (1.0.3.0) — strict conformance.
@@ -46,8 +41,6 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 @RestController
 @RequestMapping("/csc/v1")
 public class CscV1Controller {
-
-    private static final Logger log = LoggerFactory.getLogger(CscV1Controller.class);
 
     private final TokenService tokenService;
     private final CertificateService certificateService;
@@ -68,7 +61,6 @@ public class CscV1Controller {
 
     @GetMapping("/info")
     public ResponseEntity<?> info(@RequestParam(value = "lang", required = false) String lang) {
-        log.info("GET /csc/v1/info lang={}", LogSanitizer.clean(lang));
         return ResponseEntity.ok(new InfoResponse(
                 "1.0.3.0",
                 "EUDIStack Mock TSP",
@@ -94,7 +86,6 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody(required = false) CredentialsListRequest request
     ) {
-        log.info("POST /csc/v1/credentials/list");
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -107,10 +98,6 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v1/credentials/info credentialID={}",
-                    LogSanitizer.clean(request.credentialID()));
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
         var tenant = tenantResult.tenant();
@@ -152,10 +139,6 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsAuthorizeRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v1/credentials/authorize credentialID={} numSignatures={}",
-                    LogSanitizer.clean(request.credentialID()), request.numSignatures());
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -181,11 +164,6 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignHashRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v1/signatures/signHash credentialID={} hashes={}",
-                    LogSanitizer.clean(request.credentialID()),
-                    request.hash() != null ? request.hash().size() : 0);
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -196,11 +174,6 @@ public class CscV1Controller {
         }
 
         var signatures = signingService.signHashes(request.hash(), tenantResult.tenant());
-        log.info("credential.signed",
-                kv("event", "credential.signed"),
-                kv("credential_id", LogSanitizer.clean(request.credentialID())),
-                kv("signature_count", signatures.size()),
-                kv("result", "success"));
         audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v1");
         return ResponseEntity.ok(new SignHashResponse(signatures));
     }

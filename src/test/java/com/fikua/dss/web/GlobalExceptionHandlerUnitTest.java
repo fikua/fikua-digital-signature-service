@@ -26,7 +26,7 @@ class GlobalExceptionHandlerUnitTest {
 
     @Test
     void unknownPathIsA404NotAServerError() {
-        var resp = handler.handleNoResource(new NoResourceFoundException(HttpMethod.GET, "actuator/health"));
+        var resp = handler.handleNoResource(new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health"));
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
         assertNotNull(resp.getBody());
         assertEquals("not_found", resp.getBody().error());

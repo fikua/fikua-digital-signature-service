@@ -90,8 +90,10 @@ springdoc:
     tags-sorter: alpha
     display-request-duration: true
 
-# OpenTelemetry. The OTLP exporter is silent unless OTEL_EXPORTER_OTLP_ENDPOINT
-# is set in the environment.
+# OpenTelemetry Spring Boot starter (fikua-docs conv-observability.md). Each
+# signal is exported over OTLP/HTTP only when its OTEL_*_EXPORTER is otlp; the
+# deployment sets those and OTEL_EXPORTER_OTLP_ENDPOINT. service.version comes
+# from META-INF/build-info.properties (build.gradle).
 otel:
   service:
     name: ${spring.application.name}
@@ -101,6 +103,13 @@ otel:
     exporter: ${OTEL_METRICS_EXPORTER:none}
   logs:
     exporter: ${OTEL_LOGS_EXPORTER:none}
+  instrumentation:
+    logback-appender:
+      experimental:
+        # Values travel as SLF4J key-value pairs (log.atInfo().addKeyValue(...)):
+        # each one becomes a log attribute, a column in OpenObserve (OBS-08).
+        capture-key-value-pair-attributes: true
+        capture-mdc-attributes: request_id
 
 logging:
   level:

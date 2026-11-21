@@ -20,9 +20,6 @@ import com.fikua.dss.dto.v2.SignHashResponse;
 import com.fikua.dss.service.CertificateService;
 import com.fikua.dss.service.SigningService;
 import com.fikua.dss.service.TokenService;
-import com.fikua.dss.util.LogSanitizer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,8 +32,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.TimeZone;
-
-import static net.logstash.logback.argument.StructuredArguments.kv;
 
 /**
  * CSC API v2 (2.1.0.1) — conformant implementation.
@@ -55,8 +50,6 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 @RestController
 @RequestMapping("/csc/v2")
 public class CscV2Controller {
-
-    private static final Logger log = LoggerFactory.getLogger(CscV2Controller.class);
 
     private final TokenService tokenService;
     private final CertificateService certificateService;
@@ -77,7 +70,6 @@ public class CscV2Controller {
 
     @PostMapping("/info")
     public ResponseEntity<?> info(@RequestBody(required = false) Object body) {
-        log.info("POST /csc/v2/info");
         return ResponseEntity.ok(new InfoResponse(
                 "2.0.0.0",
                 "EUDIStack Mock TSP",
@@ -116,7 +108,6 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody(required = false) CredentialsListRequest request
     ) {
-        log.info("POST /csc/v2/credentials/list");
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -129,10 +120,6 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v2/credentials/info credentialID={}",
-                    LogSanitizer.clean(request.credentialID()));
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
         var tenant = tenantResult.tenant();
@@ -176,10 +163,6 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsAuthorizeRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v2/credentials/authorize credentialID={} numSignatures={}",
-                    LogSanitizer.clean(request.credentialID()), request.numSignatures());
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -205,11 +188,6 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignHashRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v2/signatures/signHash credentialID={} hashes={}",
-                    LogSanitizer.clean(request.credentialID()),
-                    request.hashes() != null ? request.hashes().size() : 0);
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -225,11 +203,6 @@ public class CscV2Controller {
         }
 
         var signatures = signingService.signHashes(request.hashes(), tenantResult.tenant());
-        log.info("credential.signed",
-                kv("event", "credential.signed"),
-                kv("credential_id", LogSanitizer.clean(request.credentialID())),
-                kv("signature_count", signatures.size()),
-                kv("result", "success"));
         audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignHashResponse(signatures, null));
     }
@@ -239,12 +212,6 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignDocRequest request
     ) {
-        if (log.isInfoEnabled()) {
-            log.info("POST /csc/v2/signatures/signDoc credentialID={} documents={} documentDigests={}",
-                    LogSanitizer.clean(request.credentialID()),
-                    request.documents() != null ? request.documents().size() : 0,
-                    request.documentDigests() != null ? request.documentDigests().size() : 0);
-        }
         var tenantResult = resolveTenant(authHeader);
         if (tenantResult.error() != null) return tenantResult.error();
 
@@ -263,11 +230,6 @@ public class CscV2Controller {
             var signatures = signingService.signDocuments(docs, tenantResult.tenant());
 
             var signedDocs = new ArrayList<>(signatures);
-            log.info("credential.signed",
-                    kv("event", "credential.signed"),
-                    kv("credential_id", LogSanitizer.clean(request.credentialID())),
-                    kv("signature_count", signedDocs.size()),
-                    kv("result", "success"));
             audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signedDocs.size(), "v2");
             return ResponseEntity.ok(new SignDocResponse(signedDocs, signatures, null, null));
         }
@@ -278,11 +240,6 @@ public class CscV2Controller {
                 if (dd.hashes() != null) allHashes.addAll(dd.hashes());
             }
             var signatures = signingService.signHashes(allHashes, tenantResult.tenant());
-            log.info("credential.signed",
-                    kv("event", "credential.signed"),
-                    kv("credential_id", LogSanitizer.clean(request.credentialID())),
-                    kv("signature_count", signatures.size()),
-                    kv("result", "success"));
             audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v2");
             return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
         }

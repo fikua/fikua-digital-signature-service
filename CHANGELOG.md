@@ -4,7 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-21
+
+### Changed
+- **Spring Boot 4.2** (3.4.4 was out of support): health API in
+  `org.springframework.boot.health`, web MVC starters, Jackson 3 in tests.
+  springdoc 3.2, OpenTelemetry starter 2.34, BouncyCastle 1.87,
+  nimbus-jose-jwt 10.10.
+- **Logs** (fikua-docs conv-observability.md, OBS-08): a stable message with
+  the values as SLF4J key-value pairs, exported as log attributes (columns in
+  OpenObserve). Unhandled errors carry `error.type`, `exception.type` and
+  `error.message` (280 characters). The per-request echoes and the
+  `credential.signed` log lines are gone: traces and the audit events cover them.
+- `service.version` and the startup log carry the release version; the build
+  fails on a `v*` tag that does not match `build.gradle`.
+
+### Removed
+- `SignHashRawBodyLoggingFilter`, a temporary diagnostic that logged every
+  `signHash` request body, SAD included (OBS-05).
+- The certificate subject in the startup log: once credentials hold personal
+  certificates it is a name.
+
+## Released in 0.4.0 – 0.5.0 (not recorded per version)
 
 ### Added
 - **Audit events** (fikua-docs ADR 0014 and ADR 0017): `token.issued`,
@@ -15,7 +36,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Business counter** `dss.business.operations` (operation, outcome, tenant and,
   for a rejection, error.type), one increment per audit event (fikua-docs
   observability convention, OBS-09).
-- Unhandled errors carry `error.type` and `exception.type` (MDC), OBS-08.
 
 ### Fixed
 - An unknown path (`NoResourceFoundException`: scanners, `/actuator/health`)

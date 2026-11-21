@@ -23,8 +23,6 @@
                 <includeMdcKeyName>trace_id</includeMdcKeyName>
                 <includeMdcKeyName>span_id</includeMdcKeyName>
                 <includeMdcKeyName>request_id</includeMdcKeyName>
-                <includeMdcKeyName>error.type</includeMdcKeyName>
-                <includeMdcKeyName>exception.type</includeMdcKeyName>
                 <fieldNames>
                     <timestamp>timestamp</timestamp>
                     <message>message</message>
