@@ -35,8 +35,8 @@ abstract class GenerateTestCerts extends DefaultTask {
         def outDir = outputDir.get().asFile
         outDir.mkdirs()
         generate(outDir, 'mock-eseal', '/C=ES/O=Fikua/CN=Fikua Test e-Seal')
-        // Second tenant's cert, used by multi-tenant isolation tests.
-        generate(outDir, 'tenant-b-eseal', '/C=ES/O=Tenant B/CN=Tenant B Test e-Seal')
+        // A second certificate: another user's, or a user's second credential.
+        generate(outDir, 'other-eseal', '/C=ES/O=Other/CN=Other Test e-Seal')
     }
 
     private void generate(File outDir, String basename, String subject) {
@@ -88,7 +88,7 @@ tasks.named('jacocoTestReport') {
 group = 'com.fikua'
 // The release version: the v<version> tag must match it (checked below), and it
 // becomes the jar's version and the telemetry's service.version (build-info).
-version = '0.8.0'
+version = '0.9.0'
 
 java {
     toolchain {

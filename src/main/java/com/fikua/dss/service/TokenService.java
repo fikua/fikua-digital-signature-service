@@ -1,76 +1,75 @@
 package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
-import com.fikua.dss.config.DssProperties.TenantProperties;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Access tokens (one per authenticated user) and SADs (one per authorized
+ * credential, single use), both in memory.
+ */
 @Service
 public class TokenService {
 
     private final DssProperties properties;
+    private final CredentialService credentials;
     private final Map<String, TokenEntry> activeTokens = new ConcurrentHashMap<>();
     private final Map<String, SadEntry> activeSads = new ConcurrentHashMap<>();
 
-    public TokenService(DssProperties properties) {
+    public TokenService(DssProperties properties, CredentialService credentials) {
         this.properties = properties;
+        this.credentials = credentials;
     }
 
     public String issueAccessToken(String clientId, String clientSecret) {
-        var tenant = findTenantByClientId(clientId);
-        if (tenant == null || !tenant.clientSecret().equals(clientSecret)) {
+        var user = credentials.user(clientId);
+        if (user == null || !matches(user.clientSecret(), clientSecret)) {
             throw new SecurityException("Invalid client credentials");
         }
         var token = UUID.randomUUID().toString();
-        var expiry = Instant.now().plusSeconds(properties.tokenTtlSeconds());
-        activeTokens.put(token, new TokenEntry(tenant.clientId(), expiry));
+        activeTokens.put(token, new TokenEntry(user.id(), Instant.now().plusSeconds(properties.tokenTtlSeconds())));
         return token;
     }
 
-    public boolean validateToken(String token) {
-        return resolveTenantClientId(token) != null;
-    }
-
-    /**
-     * Returns the client-id of the tenant the token was issued for, or null
-     * if the token is missing, expired, or already removed.
-     */
-    public String resolveTenantClientId(String token) {
+    /** The user the token was issued to, or null if it is unknown or expired. */
+    public String resolveUserId(String token) {
         var entry = activeTokens.get(token);
         if (entry == null) return null;
         if (Instant.now().isAfter(entry.expiry())) {
             activeTokens.remove(token);
             return null;
         }
-        return entry.tenantClientId();
+        return entry.userId();
     }
 
-    public String issueSad(String tenantClientId, String credentialId, String password) {
-        var tenant = findTenantByClientId(tenantClientId);
-        if (tenant == null || !tenant.credentialId().equals(credentialId)) {
-            throw new SecurityException("Unknown credential ID: " + credentialId);
+    public String issueSad(String userId, String credentialId, String password) {
+        var credential = credentials.credential(userId, credentialId);
+        if (credential == null) {
+            throw new SecurityException("Unknown credential ID");
         }
-        if (!tenant.credentialPassword().equals(password)) {
+        if (!matches(credential.password(), password)) {
             throw new SecurityException("Invalid credential password");
         }
         var sad = UUID.randomUUID().toString();
-        var expiry = Instant.now().plusSeconds(properties.sadTtlSeconds());
-        activeSads.put(sad, new SadEntry(tenantClientId, credentialId, expiry));
+        activeSads.put(sad, new SadEntry(userId, credentialId, Instant.now().plusSeconds(properties.sadTtlSeconds())));
         return sad;
     }
 
-    public boolean validateSad(String tenantClientId, String sad, String credentialId) {
-        var entry = activeSads.get(sad);
+    /** True once for a SAD this user obtained for this credential and that has not expired. */
+    public boolean validateSad(String userId, String sad, String credentialId) {
+        var entry = sad == null ? null : activeSads.get(sad);
         if (entry == null) return false;
         if (Instant.now().isAfter(entry.expiry())) {
             activeSads.remove(sad);
             return false;
         }
-        if (!entry.tenantClientId().equals(tenantClientId) || !entry.credentialId().equals(credentialId)) {
+        if (!entry.userId().equals(userId) || !entry.credentialId().equals(credentialId)) {
             return false;
         }
         activeSads.remove(sad);
@@ -81,15 +80,13 @@ public class TokenService {
         activeTokens.remove(token);
     }
 
-    private TenantProperties findTenantByClientId(String clientId) {
-        if (properties.tenants() == null) return null;
-        return properties.tenants().stream()
-                .filter(t -> t.clientId().equals(clientId))
-                .findFirst()
-                .orElse(null);
+    /** Constant-time comparison of a configured secret with the one presented. */
+    private static boolean matches(String expected, String presented) {
+        return expected != null && presented != null && MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8));
     }
 
-    private record TokenEntry(String tenantClientId, Instant expiry) {}
+    private record TokenEntry(String userId, Instant expiry) {}
 
-    private record SadEntry(String tenantClientId, String credentialId, Instant expiry) {}
+    private record SadEntry(String userId, String credentialId, Instant expiry) {}
 }

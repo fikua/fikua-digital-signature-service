@@ -1,6 +1,6 @@
 package com.fikua.dss.health;
 
-import com.fikua.dss.service.CertificateService;
+import com.fikua.dss.service.CredentialService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
@@ -10,60 +10,58 @@ import java.time.Clock;
 import java.time.Instant;
 
 /**
- * Exposes each tenant's signing cert + private key as an Actuator health
- * component under /health → components.certificate. Returns DOWN as soon as
- * any tenant's cert is not yet valid, has expired, or failed to load its key.
+ * Exposes each credential's certificate as an Actuator health component under
+ * /health → components.certificate. Returns DOWN as soon as any credential's
+ * certificate is not yet valid or has expired.
  */
 @Component("certificate")
 public class CertificateHealthIndicator implements HealthIndicator {
 
     private static final String REASON_KEY = "reason";
 
-    private final CertificateService certificateService;
+    private final CredentialService credentialService;
     private final Clock clock;
 
     @Autowired
-    public CertificateHealthIndicator(CertificateService certificateService) {
-        this(certificateService, Clock.systemUTC());
+    public CertificateHealthIndicator(CredentialService credentialService) {
+        this(credentialService, Clock.systemUTC());
     }
 
-    CertificateHealthIndicator(CertificateService certificateService, Clock clock) {
-        this.certificateService = certificateService;
+    CertificateHealthIndicator(CredentialService credentialService, Clock clock) {
+        this.credentialService = credentialService;
         this.clock = clock;
     }
 
     @Override
     public Health health() {
         try {
-            var tenants = certificateService.allTenants();
-            if (tenants.isEmpty()) {
-                return Health.down().withDetail(REASON_KEY, "no tenants configured").build();
+            var all = credentialService.allCredentials();
+            if (all.isEmpty()) {
+                return Health.down().withDetail(REASON_KEY, "no credentials configured").build();
             }
 
             var now = Instant.now(clock);
             var builder = Health.up();
-            for (var entry : tenants.entrySet()) {
-                var clientId = entry.getKey();
-                var material = entry.getValue();
-                var cert = material.certificateChain().getFirst();
+            for (var credential : all) {
+                var id = credential.id();
+                var cert = credential.certificateChain().getFirst();
                 var notBefore = cert.getNotBefore().toInstant();
                 var notAfter = cert.getNotAfter().toInstant();
 
                 if (now.isBefore(notBefore)) {
                     return Health.down()
-                            .withDetail(REASON_KEY, "certificate not yet valid for tenant " + clientId)
+                            .withDetail(REASON_KEY, "certificate not yet valid for credential " + id)
                             .withDetail("validFrom", notBefore.toString())
                             .build();
                 }
                 if (now.isAfter(notAfter)) {
                     return Health.down()
-                            .withDetail(REASON_KEY, "certificate expired for tenant " + clientId)
+                            .withDetail(REASON_KEY, "certificate expired for credential " + id)
                             .withDetail("validTo", notAfter.toString())
                             .build();
                 }
-                builder.withDetail(clientId, cert.getSubjectX500Principal().getName()
-                        + " (valid to " + notAfter + ")");
-                builder.withDetail(clientId + ".keyAlgorithm", material.privateKey().getAlgorithm());
+                builder.withDetail(id, cert.getSubjectX500Principal().getName()
+                        + " (valid to " + notAfter + ", user " + credential.userId() + ")");
             }
             return builder.build();
         } catch (Exception e) {

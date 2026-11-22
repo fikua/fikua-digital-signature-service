@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-11-22
+
+### Changed
+- **Users and credentials** (CSC v2) instead of "tenants": `dss.users[n]` with
+  `client-id`, `client-secret` and `credentials[m]` (`id`, `password`,
+  `certificate`). A user can own several credentials; `credentials/list` returns
+  all of them. **Breaking configuration**: `DSS_TENANTS_<n>_*` becomes
+  `DSS_USERS_<n>_*` with `CREDENTIALS_<m>_*`; the flat `CLIENT_ID`,
+  `CREDENTIAL_ID`, ... aliases are gone.
+- **Audit and metrics**: the attribute `tenant.client_id` is now `user.id` and the
+  `dss.business.operations` label `tenant` is now `user` (records archived before
+  0.9.0 keep the old names; noted in the `AuditEvents` catalogue).
+- signHash and signDoc sign with the credential the SAD authorizes (before, with
+  the user's only credential).
+- Client secrets and credential passwords are compared in constant time.
+- CSC v2 `info` announces what the service produces: `C` and `J`, `AdES-B-B`.
+
 ## [0.8.0] - 2026-11-22
 
 ### Added

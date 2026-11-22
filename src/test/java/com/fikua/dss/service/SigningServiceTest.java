@@ -1,8 +1,6 @@
 package com.fikua.dss.service;
 
-import com.fikua.dss.config.DssProperties.CertificateProperties;
-import com.fikua.dss.config.DssProperties.TenantProperties;
-import com.fikua.dss.service.CertificateService.TenantMaterial;
+import com.fikua.dss.service.CredentialService.Credential;
 import com.fikua.dss.web.InvalidRequestException;
 import eu.europa.esig.dss.enumerations.SignatureLevel;
 import eu.europa.esig.dss.model.InMemoryDocument;
@@ -48,9 +46,9 @@ class SigningServiceTest {
     private static final String SHA384 = "2.16.840.1.101.3.4.2.2";
     private static final byte[] DATA = "a document to sign".getBytes(StandardCharsets.UTF_8);
 
-    private static TenantMaterial ec;
-    private static TenantMaterial rsa;
-    private static TenantMaterial p384;
+    private static Credential ec;
+    private static Credential rsa;
+    private static Credential p384;
 
     private final SigningService service = new SigningService();
 
@@ -136,14 +134,14 @@ class SigningServiceTest {
         assertThrows(InvalidRequestException.class, () -> service.signDocument(DATA, "J", "AdES-B-T", ec));
     }
 
-    private byte[] signHash(TenantMaterial credential, String jcaDigest, String oid) throws Exception {
+    private byte[] signHash(Credential credential, String jcaDigest, String oid) throws Exception {
         var hash = b64url(MessageDigest.getInstance(jcaDigest).digest(DATA));
         var signatures = service.signHashes(List.of(hash), oid, credential);
         assertEquals(1, signatures.size());
         return Base64.getUrlDecoder().decode(signatures.getFirst());
     }
 
-    private static boolean verify(String algorithm, TenantMaterial credential, byte[] signature) throws Exception {
+    private static boolean verify(String algorithm, Credential credential, byte[] signature) throws Exception {
         var sig = Signature.getInstance(algorithm);
         sig.initVerify(credential.certificateChain().getFirst());
         sig.update(DATA);
@@ -167,7 +165,7 @@ class SigningServiceTest {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value);
     }
 
-    private static TenantMaterial credential(String id, String algorithm, int size, String certAlgorithm)
+    private static Credential credential(String id, String algorithm, int size, String certAlgorithm)
             throws Exception {
         var generator = KeyPairGenerator.getInstance(algorithm);
         generator.initialize(size);
@@ -179,9 +177,7 @@ class SigningServiceTest {
                 name, pair.getPublic())
                 .build(new JcaContentSignerBuilder(certAlgorithm).build(pair.getPrivate()));
         X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(holder);
-        var properties = new TenantProperties("client-" + id, "s", id, "p",
-                new CertificateProperties("file:/dev/null", "file:/dev/null"));
-        return new TenantMaterial(properties, List.of(certificate),
+        return new Credential(id, "client-" + id, "p", List.of(certificate),
                 List.of(Base64.getEncoder().encodeToString(certificate.getEncoded())), pair.getPrivate());
     }
 }

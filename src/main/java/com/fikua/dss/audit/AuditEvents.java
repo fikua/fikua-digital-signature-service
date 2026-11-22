@@ -23,21 +23,25 @@ import org.springframework.stereotype.Component;
  * <table>
  *   <caption>Catalogue</caption>
  *   <tr><th>event.name</th><th>When</th><th>Attributes</th></tr>
- *   <tr><td>token.issued</td><td>an access token was issued to a client</td>
- *       <td>tenant.client_id</td></tr>
+ *   <tr><td>token.issued</td><td>an access token was issued to a user</td>
+ *       <td>user.id</td></tr>
  *   <tr><td>credential.authorized</td><td>a SAD was issued for a credential</td>
- *       <td>tenant.client_id, credential.id</td></tr>
+ *       <td>user.id, credential.id</td></tr>
  *   <tr><td>credential.signed</td><td>hashes or documents were signed</td>
- *       <td>tenant.client_id, credential.id, signature.count, csc.version</td></tr>
+ *       <td>user.id, credential.id, signature.count, csc.version</td></tr>
  *   <tr><td>auth.rejected</td><td>a client, token, SAD or authorization data was refused</td>
- *       <td>tenant.client_id (only when it is a known tenant), reason</td></tr>
+ *       <td>user.id (only when it is a known user), reason</td></tr>
  * </table>
+ *
+ * <p>{@code user.id} is the OAuth2 client id of the user (CSC v2). Until 0.8.0 the
+ * same value was called {@code tenant.client_id}, and the metric label {@code tenant}:
+ * records archived before 0.9.0 carry the old names (reviewed on 2026-11-22).
  *
  * <p>No hash, document, IP address or personal name is ever an attribute.
  *
  * <p>Every event is also counted in {@code dss.business.operations} (fikua-docs
  * observability convention, OBS-09), labelled {@code operation}, {@code outcome},
- * {@code tenant} and, for a rejection, {@code error.type}. Dashboards read the counter;
+ * {@code user} and, for a rejection, {@code error.type}. Dashboards read the counter;
  * the archive keeps the events.
  */
 @Component
@@ -47,7 +51,7 @@ public class AuditEvents {
 
     static final AttributeKey<String> EVENT_DOMAIN = AttributeKey.stringKey("event.domain");
     static final AttributeKey<String> EVENT_NAME = AttributeKey.stringKey("event.name");
-    static final AttributeKey<String> TENANT = AttributeKey.stringKey("tenant.client_id");
+    static final AttributeKey<String> USER = AttributeKey.stringKey("user.id");
     static final AttributeKey<String> CREDENTIAL = AttributeKey.stringKey("credential.id");
     static final AttributeKey<Long> SIGNATURE_COUNT = AttributeKey.longKey("signature.count");
     static final AttributeKey<String> CSC_VERSION = AttributeKey.stringKey("csc.version");
@@ -56,7 +60,7 @@ public class AuditEvents {
     static final AttributeKey<String> OPERATION = AttributeKey.stringKey("operation");
     static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("outcome");
     static final AttributeKey<String> ERROR_TYPE = AttributeKey.stringKey("error.type");
-    static final AttributeKey<String> TENANT_LABEL = AttributeKey.stringKey("tenant");
+    static final AttributeKey<String> USER_LABEL = AttributeKey.stringKey("user");
 
     /** Reasons for {@code auth.rejected}, with the business operation each one refuses. */
     public enum Reason {
@@ -87,50 +91,50 @@ public class AuditEvents {
         this.logger = openTelemetry.getLogsBridge().loggerBuilder(INSTRUMENTATION_SCOPE).build();
         this.operations = openTelemetry.getMeter(INSTRUMENTATION_SCOPE)
                 .counterBuilder("dss.business.operations")
-                .setDescription("Business operations of the signature service, by operation, outcome and tenant")
+                .setDescription("Business operations of the signature service, by operation, outcome and user")
                 .setUnit("{operation}")
                 .build();
     }
 
-    public void tokenIssued(String tenantClientId) {
-        emit("token.issued", Attributes.builder().put(TENANT, tenantClientId));
-        count("token.issue", "success", tenantClientId, null);
+    public void tokenIssued(String userId) {
+        emit("token.issued", Attributes.builder().put(USER, userId));
+        count("token.issue", "success", userId, null);
     }
 
-    public void credentialAuthorized(String tenantClientId, String credentialId) {
+    public void credentialAuthorized(String userId, String credentialId) {
         emit("credential.authorized", Attributes.builder()
-                .put(TENANT, tenantClientId)
+                .put(USER, userId)
                 .put(CREDENTIAL, credentialId));
-        count("credential.authorize", "success", tenantClientId, null);
+        count("credential.authorize", "success", userId, null);
     }
 
-    public void credentialSigned(String tenantClientId, String credentialId, int signatureCount, String cscVersion) {
+    public void credentialSigned(String userId, String credentialId, int signatureCount, String cscVersion) {
         emit("credential.signed", Attributes.builder()
-                .put(TENANT, tenantClientId)
+                .put(USER, userId)
                 .put(CREDENTIAL, credentialId)
                 .put(SIGNATURE_COUNT, signatureCount)
                 .put(CSC_VERSION, cscVersion));
-        count("credential.sign", "success", tenantClientId, null);
+        count("credential.sign", "success", userId, null);
     }
 
     /**
-     * @param knownTenantClientId the tenant, only when the caller is a known tenant;
-     *                            null otherwise (never a value the caller made up)
+     * @param knownUserId the user, only when the caller is a known user;
+     *                    null otherwise (never a value the caller made up)
      */
-    public void authRejected(String knownTenantClientId, Reason reason) {
+    public void authRejected(String knownUserId, Reason reason) {
         var attributes = Attributes.builder().put(REASON, reason.value);
-        if (knownTenantClientId != null) {
-            attributes.put(TENANT, knownTenantClientId);
+        if (knownUserId != null) {
+            attributes.put(USER, knownUserId);
         }
         emit("auth.rejected", attributes);
-        count(reason.operation, "rejected", knownTenantClientId, reason.value);
+        count(reason.operation, "rejected", knownUserId, reason.value);
     }
 
-    private void count(String operation, String outcome, String tenantClientId, String errorType) {
+    private void count(String operation, String outcome, String userId, String errorType) {
         var labels = Attributes.builder()
                 .put(OPERATION, operation)
                 .put(OUTCOME, outcome)
-                .put(TENANT_LABEL, tenantClientId != null ? tenantClientId : "unknown");
+                .put(USER_LABEL, userId != null ? userId : "unknown");
         if (errorType != null) {
             labels.put(ERROR_TYPE, errorType);
         }

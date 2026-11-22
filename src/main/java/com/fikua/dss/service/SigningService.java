@@ -79,7 +79,7 @@ public class SigningService {
 
     /** signHash: each hash (base64url) signed with the credential's key; base64url results. */
     public List<String> signHashes(List<String> hashesBase64, String hashAlgorithmOid,
-                                   CertificateService.TenantMaterial credential) {
+                                   CredentialService.Credential credential) {
         var digestAlgorithm = digestAlgorithm(hashAlgorithmOid);
         var key = key(credential);
         var signatureAlgorithm = SignatureAlgorithm.ECDSA_SHA256;
@@ -97,7 +97,7 @@ public class SigningService {
 
     /** signDoc, documents mode: one signature per document, in the requested format. */
     public SignedDocument signDocument(byte[] document, String signatureFormat, String conformanceLevel,
-                                       CertificateService.TenantMaterial credential) {
+                                       CredentialService.Credential credential) {
         var format = SignatureFormat.of(signatureFormat);
         var key = key(credential);
         return switch (format) {
@@ -176,8 +176,8 @@ public class SigningService {
         return Base64.getEncoder().encodeToString(value);
     }
 
-    private SigningKey key(CertificateService.TenantMaterial credential) {
-        return keys.computeIfAbsent(credential.tenant().credentialId(), id -> SigningKey.of(credential));
+    private SigningKey key(CredentialService.Credential credential) {
+        return keys.computeIfAbsent(credential.id(), id -> SigningKey.of(credential));
     }
 
     /** A DSS token over an in-memory PKCS#12 holding the credential's key and chain. */
@@ -185,7 +185,7 @@ public class SigningService {
 
         private static final SecureRandom RANDOM = new SecureRandom();
 
-        static SigningKey of(CertificateService.TenantMaterial credential) {
+        static SigningKey of(CredentialService.Credential credential) {
             Es256.requireP256(credential.certificateChain().getFirst());
             try {
                 // Never leaves the process: it only protects the in-memory PKCS#12.

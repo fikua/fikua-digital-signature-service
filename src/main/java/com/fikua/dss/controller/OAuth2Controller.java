@@ -5,6 +5,7 @@ import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.dto.common.TokenResponse;
+import com.fikua.dss.service.CredentialService;
 import com.fikua.dss.service.TokenService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,11 +20,14 @@ public class OAuth2Controller {
     private final TokenService tokenService;
     private final DssProperties properties;
     private final AuditEvents audit;
+    private final CredentialService credentials;
 
-    public OAuth2Controller(TokenService tokenService, DssProperties properties, AuditEvents audit) {
+    public OAuth2Controller(TokenService tokenService, DssProperties properties, AuditEvents audit,
+                            CredentialService credentials) {
         this.tokenService = tokenService;
         this.properties = properties;
         this.audit = audit;
+        this.credentials = credentials;
     }
 
     @PostMapping(value = "/oauth2/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -58,14 +62,10 @@ public class OAuth2Controller {
             audit.tokenIssued(clientId);
             return ResponseEntity.ok(new TokenResponse(token, "Bearer", properties.tokenTtlSeconds()));
         } catch (SecurityException e) {
-            audit.authRejected(isKnownTenant(clientId) ? clientId : null, Reason.INVALID_CLIENT);
+            audit.authRejected(credentials.user(clientId) != null ? clientId : null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", e.getMessage()));
         }
     }
 
-    private boolean isKnownTenant(String clientId) {
-        return properties.tenants() != null
-                && properties.tenants().stream().anyMatch(t -> t.clientId().equals(clientId));
-    }
 }

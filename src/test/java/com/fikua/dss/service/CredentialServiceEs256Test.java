@@ -2,7 +2,8 @@ package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CertificateProperties;
-import com.fikua.dss.config.DssProperties.TenantProperties;
+import com.fikua.dss.config.DssProperties.CredentialProperties;
+import com.fikua.dss.config.DssProperties.UserProperties;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** A credential whose key is not EC P-256 stops the start (ES256 only). */
-class CertificateServiceEs256Test {
+class CredentialServiceEs256Test {
 
     @Test
     void refusesAnRsaCredential(@TempDir Path dir) throws Exception {
@@ -40,8 +41,9 @@ class CertificateServiceEs256Test {
         Files.writeString(crt, pem("CERTIFICATE", cert.getEncoded()));
         Files.writeString(key, pem("PRIVATE KEY", pair.getPrivate().getEncoded()));
 
-        var service = new CertificateService(new DssProperties(List.of(new TenantProperties(
-                "c", "s", "id", "p", new CertificateProperties("file:" + crt, "file:" + key))), 3600, 300));
+        var service = new CredentialService(new DssProperties(List.of(new UserProperties("c", "s",
+                List.of(new CredentialProperties("id", "p", new CertificateProperties("file:" + crt, "file:" + key))))),
+                3600, 300));
 
         var error = assertThrows(IllegalStateException.class, service::init);
         assertTrue(error.getMessage().contains("P-256"), error.getMessage());

@@ -12,7 +12,7 @@ import com.fikua.dss.dto.v1.CredentialsListResponse;
 import com.fikua.dss.dto.v1.InfoResponse;
 import com.fikua.dss.dto.v1.SignHashRequest;
 import com.fikua.dss.dto.v1.SignHashResponse;
-import com.fikua.dss.service.CertificateService;
+import com.fikua.dss.service.CredentialService;
 import com.fikua.dss.service.SigningService;
 import com.fikua.dss.service.TokenService;
 import org.springframework.http.ResponseEntity;
@@ -43,18 +43,18 @@ import java.util.TimeZone;
 public class CscV1Controller {
 
     private final TokenService tokenService;
-    private final CertificateService certificateService;
+    private final CredentialService credentialService;
     private final SigningService signingService;
     private final AuditEvents audit;
 
     public CscV1Controller(
             TokenService tokenService,
-            CertificateService certificateService,
+            CredentialService credentialService,
             SigningService signingService,
             AuditEvents audit
     ) {
         this.tokenService = tokenService;
-        this.certificateService = certificateService;
+        this.credentialService = credentialService;
         this.signingService = signingService;
         this.audit = audit;
     }
@@ -86,11 +86,11 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody(required = false) CredentialsListRequest request
     ) {
-        var tenantResult = resolveTenant(authHeader);
-        if (tenantResult.error() != null) return tenantResult.error();
+        var caller = resolveUser(authHeader);
+        if (caller.error() != null) return caller.error();
 
         return ResponseEntity.ok(new CredentialsListResponse(
-                List.of(tenantResult.tenant().tenant().credentialId()), null));
+                caller.user().credentialIds(), null));
     }
 
     @PostMapping("/credentials/info")
@@ -98,28 +98,27 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        var tenantResult = resolveTenant(authHeader);
-        if (tenantResult.error() != null) return tenantResult.error();
-        var tenant = tenantResult.tenant();
-
-        if (!tenant.tenant().credentialId().equals(request.credentialID())) {
+        var caller = resolveUser(authHeader);
+        if (caller.error() != null) return caller.error();
+        var credential = credentialService.credential(caller.userId(), request.credentialID());
+        if (credential == null) {
             return ResponseEntity.badRequest().body(
                     new ErrorResponse("invalid_request", "Unknown credential ID"));
         }
 
-        var cert = tenant.certificateChain().getFirst();
+        var cert = credential.certificateChain().getFirst();
         var df = new SimpleDateFormat("yyyyMMddHHmmss'Z'");
         df.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         var keyInfo = new CredentialsInfoResponse.KeyInfo(
                 "enabled",
-                List.of(tenant.getKeyAlgorithmOid()),
-                tenant.getKeyLength()
+                List.of(credential.getKeyAlgorithmOid()),
+                credential.getKeyLength()
         );
 
         var certInfo = new CredentialsInfoResponse.CertInfo(
                 "valid",
-                tenant.certificateChainBase64(),
+                credential.certificateChainBase64(),
                 cert.getIssuerX500Principal().getName(),
                 cert.getSerialNumber().toString(16),
                 cert.getSubjectX500Principal().getName(),
@@ -139,8 +138,8 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsAuthorizeRequest request
     ) {
-        var tenantResult = resolveTenant(authHeader);
-        if (tenantResult.error() != null) return tenantResult.error();
+        var caller = resolveUser(authHeader);
+        if (caller.error() != null) return caller.error();
 
         // v1: PIN is the auth secret (OTP optional, ignored for mock)
         if (request.PIN() == null || request.PIN().isBlank()) {
@@ -149,11 +148,11 @@ public class CscV1Controller {
         }
 
         try {
-            var sad = tokenService.issueSad(tenantResult.tenantClientId(), request.credentialID(), request.PIN());
-            audit.credentialAuthorized(tenantResult.tenantClientId(), request.credentialID());
+            var sad = tokenService.issueSad(caller.userId(), request.credentialID(), request.PIN());
+            audit.credentialAuthorized(caller.userId(), request.credentialID());
             return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, null));
         } catch (SecurityException e) {
-            audit.authRejected(tenantResult.tenantClientId(), Reason.INVALID_AUTHORIZATION_DATA);
+            audit.authRejected(caller.userId(), Reason.INVALID_AUTHORIZATION_DATA);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_request", e.getMessage()));
         }
@@ -164,47 +163,48 @@ public class CscV1Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignHashRequest request
     ) {
-        var tenantResult = resolveTenant(authHeader);
-        if (tenantResult.error() != null) return tenantResult.error();
+        var caller = resolveUser(authHeader);
+        if (caller.error() != null) return caller.error();
 
-        if (!tokenService.validateSad(tenantResult.tenantClientId(), request.SAD(), request.credentialID())) {
-            audit.authRejected(tenantResult.tenantClientId(), Reason.INVALID_SAD);
+        if (!tokenService.validateSad(caller.userId(), request.SAD(), request.credentialID())) {
+            audit.authRejected(caller.userId(), Reason.INVALID_SAD);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
         }
 
-        var signatures = signingService.signHashes(request.hash(), request.hashAlgo(), tenantResult.tenant());
-        audit.credentialSigned(tenantResult.tenantClientId(), request.credentialID(), signatures.size(), "v1");
+        var credential = credentialService.credential(caller.userId(), request.credentialID());
+        var signatures = signingService.signHashes(request.hash(), request.hashAlgo(), credential);
+        audit.credentialSigned(caller.userId(), request.credentialID(), signatures.size(), "v1");
         return ResponseEntity.ok(new SignHashResponse(signatures));
     }
 
-    private TenantResolution resolveTenant(String authHeader) {
+    private UserResolution resolveUser(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return TenantResolution.error(ResponseEntity.status(401).body(
+            return UserResolution.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Missing Bearer token")));
         }
-        var token = authHeader.substring(7);
-        var tenantClientId = tokenService.resolveTenantClientId(token);
-        if (tenantClientId == null) {
+        var userId = tokenService.resolveUserId(authHeader.substring(7));
+        var user = credentialService.user(userId);
+        if (user == null) {
             audit.authRejected(null, Reason.INVALID_TOKEN);
-            return TenantResolution.error(ResponseEntity.status(401).body(
+            return UserResolution.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Invalid or expired access token")));
         }
-        var tenant = certificateService.byClientId(tenantClientId);
-        return TenantResolution.ok(tenantClientId, tenant);
+        return UserResolution.ok(user);
     }
 
-    private record TenantResolution(
-            String tenantClientId,
-            CertificateService.TenantMaterial tenant,
-            ResponseEntity<ErrorResponse> error
-    ) {
-        static TenantResolution ok(String tenantClientId, CertificateService.TenantMaterial tenant) {
-            return new TenantResolution(tenantClientId, tenant, null);
+    /** The authenticated user of a request, or the error response when there is none. */
+    private record UserResolution(CredentialService.User user, ResponseEntity<ErrorResponse> error) {
+        static UserResolution ok(CredentialService.User user) {
+            return new UserResolution(user, null);
         }
 
-        static TenantResolution error(ResponseEntity<ErrorResponse> error) {
-            return new TenantResolution(null, null, error);
+        static UserResolution error(ResponseEntity<ErrorResponse> error) {
+            return new UserResolution(null, error);
+        }
+
+        String userId() {
+            return user.id();
         }
     }
 }
