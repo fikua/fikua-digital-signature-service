@@ -35,7 +35,7 @@ class Callers {
         }
         var user = credentials.user(tokenService.resolveUserId(authHeader.substring(7)));
         if (user == null) {
-            audit.authRejected(null, Reason.INVALID_TOKEN);
+            audit.refused(null, Reason.INVALID_TOKEN);
             return Caller.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Invalid or expired access token")));
         }
@@ -54,7 +54,7 @@ class Callers {
     Credential authorized(Caller caller, String sad, String credentialId) {
         var credential = credential(caller, credentialId);
         if (credential == null || !tokenService.validateSad(caller.userId(), sad, credentialId)) {
-            audit.authRejected(caller.userId(), Reason.INVALID_SAD);
+            audit.refused(caller.userId(), Reason.INVALID_SAD);
             return null;
         }
         return credential;

@@ -122,7 +122,7 @@ public class AuditEvents {
      * @param knownUserId the user, only when the caller is a known user;
      *                    null otherwise (never a value the caller made up)
      */
-    public void authRejected(String knownUserId, Reason reason) {
+    public void refused(String knownUserId, Reason reason) {
         var attributes = Attributes.builder().put(REASON, reason.value);
         if (knownUserId != null) {
             attributes.put(USER, knownUserId);

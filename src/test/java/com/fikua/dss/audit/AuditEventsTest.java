@@ -70,7 +70,7 @@ class AuditEventsTest {
 
     @Test
     void rejectionOfAnUnknownCallerHasNoUser() {
-        audit.authRejected(null, Reason.INVALID_CLIENT);
+        audit.refused(null, Reason.INVALID_CLIENT);
 
         var record = single();
         assertThat(record.getAttributes().get(AuditEvents.EVENT_NAME)).isEqualTo("auth.rejected");
@@ -80,7 +80,7 @@ class AuditEventsTest {
 
     @Test
     void rejectionOfAKnownUserNamesIt() {
-        audit.authRejected("user-a", Reason.INVALID_SAD);
+        audit.refused("user-a", Reason.INVALID_SAD);
 
         var record = single();
         assertThat(record.getAttributes().get(AuditEvents.USER)).isEqualTo("user-a");
@@ -91,7 +91,7 @@ class AuditEventsTest {
     void everyEventIsCountedAsABusinessOperation() {
         audit.credentialSigned("user-a", "cred-1", 1, "v2");
         audit.credentialSigned("user-a", "cred-1", 2, "v2");
-        audit.authRejected(null, Reason.INVALID_CLIENT);
+        audit.refused(null, Reason.INVALID_CLIENT);
 
         var points = metrics.collectAllMetrics().stream()
                 .filter(m -> m.getName().equals("dss.business.operations"))

@@ -52,7 +52,7 @@ public class OAuth2Controller {
             clientId = parts[0];
             clientSecret = parts.length > 1 ? parts[1] : "";
         } else {
-            audit.authRejected(null, Reason.INVALID_CLIENT);
+            audit.refused(null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", "Missing Basic authentication header"));
         }
@@ -62,7 +62,7 @@ public class OAuth2Controller {
             audit.tokenIssued(clientId);
             return ResponseEntity.ok(new TokenResponse(token, "Bearer", properties.tokenTtlSeconds()));
         } catch (SecurityException e) {
-            audit.authRejected(isKnownUser(clientId) ? clientId : null, Reason.INVALID_CLIENT);
+            audit.refused(isKnownUser(clientId) ? clientId : null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", e.getMessage()));
         }

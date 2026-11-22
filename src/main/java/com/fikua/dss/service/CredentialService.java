@@ -3,21 +3,25 @@ package com.fikua.dss.service;
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CredentialProperties;
 import jakarta.annotation.PostConstruct;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
@@ -89,7 +93,7 @@ public class CredentialService {
         var chain = loadCertificate(properties.certificate().certPath());
         // ES256 only: a credential whose key is not EC P-256 stops the start.
         Es256.requireP256(chain.getFirst());
-        var privateKey = loadPrivateKey(properties.certificate().keyPath(), chain);
+        var privateKey = loadPrivateKey(properties.certificate().keyPath());
         // No subject: once credentials hold personal certificates it is a name (OBS-05).
         log.atInfo().setMessage("credential certificate loaded")
                 .addKeyValue("user.id", userId)
@@ -134,17 +138,19 @@ public class CredentialService {
         }).toList();
     }
 
-    private PrivateKey loadPrivateKey(String keyPath, List<X509Certificate> chain) {
-        try (var in = openResource(keyPath)) {
-            var pem = new String(in.readAllBytes(), StandardCharsets.UTF_8)
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .replace("-----BEGIN EC PRIVATE KEY-----", "")
-                    .replace("-----END EC PRIVATE KEY-----", "")
-                    .replaceAll("\\s", "");
-            var keySpec = new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem));
-            return KeyFactory.getInstance(chain.getFirst().getPublicKey().getAlgorithm(), "BC").generatePrivate(keySpec);
-        } catch (Exception e) {
+    /** A PKCS#8 or SEC1 ("EC PRIVATE KEY") PEM private key. */
+    private PrivateKey loadPrivateKey(String keyPath) {
+        try (var reader = new PEMParser(new InputStreamReader(openResource(keyPath), StandardCharsets.UTF_8))) {
+            var converter = new JcaPEMKeyConverter().setProvider("BC");
+            var object = reader.readObject();
+            if (object instanceof PrivateKeyInfo info) {
+                return converter.getPrivateKey(info);
+            }
+            if (object instanceof PEMKeyPair pair) {
+                return converter.getKeyPair(pair).getPrivate();
+            }
+            throw new IllegalStateException("No private key found in " + keyPath);
+        } catch (IOException e) {
             throw new IllegalStateException("Failed to load private key from " + keyPath, e);
         }
     }

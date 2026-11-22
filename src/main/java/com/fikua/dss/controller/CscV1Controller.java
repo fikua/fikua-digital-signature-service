@@ -151,7 +151,7 @@ public class CscV1Controller {
             audit.credentialAuthorized(caller.userId(), request.credentialID());
             return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, null));
         } catch (SecurityException e) {
-            audit.authRejected(caller.userId(), Reason.INVALID_AUTHORIZATION_DATA);
+            audit.refused(caller.userId(), Reason.INVALID_AUTHORIZATION_DATA);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_request", e.getMessage()));
         }
