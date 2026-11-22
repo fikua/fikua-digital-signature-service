@@ -24,10 +24,10 @@ COPY --from=build /training /training
 # unix socket, which the OpenTelemetry starter refuses: the training run starts
 # without any of them (the application's exporters then default to none).
 RUN for v in $(env | sed -n 's/^\(OTEL_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done; \
-    DSS_TENANTS_0_CLIENT_ID=training DSS_TENANTS_0_CLIENT_SECRET=training \
-    DSS_TENANTS_0_CREDENTIAL_ID=training DSS_TENANTS_0_CREDENTIAL_PASSWORD=training \
-    DSS_TENANTS_0_CERTIFICATE_CERT_PATH=file:/training/cert.pem \
-    DSS_TENANTS_0_CERTIFICATE_KEY_PATH=file:/training/key.pem \
+    DSS_USERS_0_CLIENT_ID=training DSS_USERS_0_CLIENT_SECRET=training \
+    DSS_USERS_0_CREDENTIALS_0_ID=training DSS_USERS_0_CREDENTIALS_0_PASSWORD=training \
+    DSS_USERS_0_CREDENTIALS_0_CERTIFICATE_CERT_PATH=file:/training/cert.pem \
+    DSS_USERS_0_CREDENTIALS_0_CERTIFICATE_KEY_PATH=file:/training/key.pem \
     java -XX:AOTCacheOutput=/app/dss.aot -Dspring.context.exit=onRefresh -jar /app/dss.jar
 
 FROM eclipse-temurin:25-jre-alpine

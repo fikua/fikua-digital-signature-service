@@ -5,9 +5,11 @@ Spring Boot service implementing the [Cloud Signature Consortium (CSC) API](http
 > [!WARNING]
 > **Mock mode is for development and testing only.** It accepts static client secrets and signs with test certificates. **Never deploy this as a real (qualified) TSP** and never feed it a production e-seal certificate.
 
-## Multi-tenant
+## Users and credentials
 
-The service can serve several CSC clients ("tenants") at once, each with its own OAuth2 `client_id`/`client_secret`, CSC `credentialId`, and signing certificate. A tenant's access token can only ever list, inspect, authorize, or sign with **its own** certificate — the token carries the tenant it was minted for, and every subsequent call is resolved from that token, not from client-supplied identifiers. See `MultiTenantIsolationTest` for the enforced isolation guarantees.
+The model is CSC v2's: a **user** is an OAuth2 client (`client_credentials`) and owns one or more **credentials**, each a certificate with its private key, unlocked with its own password. A user's access token only ever lists, inspects, authorizes or signs with **its own** credentials: every call resolves the user from the token, and a credential is used only when it belongs to that user and a SAD for it was issued to that user. See `UserIsolationTest`.
+
+One user per calling system (the Lab issuer, verifier and Wallet Provider are three users), so a leaked token cannot sign with another system's key.
 
 ## Endpoints
 
@@ -75,32 +77,26 @@ The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.js
 
 All settings via environment variables. The container does **not** ship with any certificate inside — you must mount your own at `/certs/`.
 
-Tenant 0 (the default/first tenant) is configured via the flat variables below, kept for backward compatibility:
+| Variable      | Default | Description |
+| ------------- | ------- | ----------- |
+| `SERVER_PORT` | `9090`  | HTTP port |
+| `TOKEN_TTL`   | `3600`  | Access token lifetime (seconds) |
+| `SAD_TTL`     | `300`   | SAD lifetime (seconds) |
 
-| Variable              | Default                      | Description                       |
-| --------------------- | ----------------------------- | --------------------------------- |
-| `SERVER_PORT`         | `9090`                       | HTTP port                         |
-| `CLIENT_ID`           | `mock-client`                | OAuth2 client ID (tenant 0)       |
-| `CLIENT_SECRET`       | `mock-secret`                | OAuth2 client secret (tenant 0)   |
-| `CREDENTIAL_ID`       | `mock-credential-001`        | CSC credential identifier (tenant 0) |
-| `CREDENTIAL_PASSWORD` | `mock-password`              | Credential authorization password (tenant 0) |
-| `CERT_PATH`           | `file:/certs/mock-eseal.crt` | X.509 certificate, PEM (tenant 0) |
-| `KEY_PATH`            | `file:/certs/mock-eseal.key` | Private key, PKCS#8 PEM (tenant 0) |
-| `TOKEN_TTL`           | `3600`                       | Access token lifetime (seconds), applies to all tenants |
-| `SAD_TTL`             | `300`                        | SAD lifetime (seconds), applies to all tenants |
-
-Additional tenants are added via indexed `DSS_TENANTS_<n>_*` variables (Spring binds indexed env vars onto the `dss.tenants` list), or `DSS_TENANTS_0_*` to override tenant 0 explicitly instead of the flat aliases above:
+Users and credentials come from indexed variables, which replace the whole `dss.users` list (the default is one local development user, `mock-client` with `mock-credential-001`):
 
 ```bash
-DSS_TENANTS_1_CLIENT_ID=fikua-issuer
-DSS_TENANTS_1_CLIENT_SECRET=<secret>
-DSS_TENANTS_1_CREDENTIAL_ID=fikua-credential-001
-DSS_TENANTS_1_CREDENTIAL_PASSWORD=<password>
-DSS_TENANTS_1_CERTIFICATE_CERT_PATH=file:/certs/fikua/fikua-eseal-chain.pem
-DSS_TENANTS_1_CERTIFICATE_KEY_PATH=file:/certs/fikua/fikua-eseal.key
+DSS_USERS_0_CLIENT_ID=fikua-issuer
+DSS_USERS_0_CLIENT_SECRET=<secret>
+DSS_USERS_0_CREDENTIALS_0_ID=fikua-credential-001
+DSS_USERS_0_CREDENTIALS_0_PASSWORD=<password>
+DSS_USERS_0_CREDENTIALS_0_CERTIFICATE_CERT_PATH=file:/certs/fikua/fikua-eseal-chain.pem
+DSS_USERS_0_CREDENTIALS_0_CERTIFICATE_KEY_PATH=file:/certs/fikua/fikua-eseal.key
 ```
 
-Every tenant's certificate + key must be mounted read-only into the container; the image never bakes in any cert material (see [Certificates — never bake into the image](CLAUDE.md)). Secrets (`*_CLIENT_SECRET`, `*_CREDENTIAL_PASSWORD`) are only ever supplied via environment variables backed by a gitignored `.env` file (or the platform's secret store) — never hardcoded in source or compose defaults.
+Credential ids are unique across users. Every credential key must be EC P-256 (ES256 only).
+
+Every credential's certificate and key must be mounted read-only into the container; the image never bakes in any cert material (see [Certificates — never bake into the image](CLAUDE.md)). Secrets (`*_CLIENT_SECRET`, `*_CREDENTIAL_PASSWORD`) are only ever supplied via environment variables backed by a gitignored `.env` file (or the platform's secret store) — never hardcoded in source or compose defaults.
 
 ## Quick start
 

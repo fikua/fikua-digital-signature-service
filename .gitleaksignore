@@ -1,2 +1,4 @@
 # PEM header strings in the key-parsing code, not a key (gitleaks private-key false positive).
 041da5a4614321e28367c2cb664fe09ea6420e3a:src/main/java/es/in2/mockqtsp/service/CertificateService.java:private-key:94
+# Same PEM header strings in the first version of CredentialService (since replaced by PEMParser).
+01688820c5838d912bd0cd86f61369f775262fbe:src/main/java/com/fikua/dss/service/CredentialService.java:private-key:140

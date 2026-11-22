@@ -13,12 +13,12 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-        "dss.tenants[0].client-id=mock-client",
-        "dss.tenants[0].client-secret=mock-secret",
-        "dss.tenants[0].credential-id=mock-credential-001",
-        "dss.tenants[0].credential-password=mock-password",
-        "dss.tenants[0].certificate.cert-path=file:build/test-certs/mock-eseal.crt",
-        "dss.tenants[0].certificate.key-path=file:build/test-certs/mock-eseal.key",
+        "dss.users[0].client-id=mock-client",
+        "dss.users[0].client-secret=mock-secret",
+        "dss.users[0].credentials[0].id=mock-credential-001",
+        "dss.users[0].credentials[0].password=mock-password",
+        "dss.users[0].credentials[0].certificate.cert-path=file:build/test-certs/mock-eseal.crt",
+        "dss.users[0].credentials[0].certificate.key-path=file:build/test-certs/mock-eseal.key",
         "dss.token-ttl-seconds=3600",
         "dss.sad-ttl-seconds=300",
         // No downloads in tests: TrustedListsTest covers the trusted lists.

@@ -12,15 +12,15 @@ DSS (Digital Signature Service — European Commission).
 **Mock mode is dev/test only — never deploy to production as a real
 (qualified) TSP.**
 
-## Multi-tenant
+## Users and credentials
 
-`dss.tenants` is a list — one entry per CSC client (own client-id/secret,
-credential-id, and signing certificate). `TokenService` resolves the
-tenant from the OAuth2 access token itself, never from a client-supplied
-`credentialID`, so one tenant's token can never list, inspect, authorize,
-or sign with another tenant's certificate. See `CertificateService`
-(per-tenant registry, keyed by `clientId` and `credentialId`) and
-`MultiTenantIsolationTest` for the enforced guarantees.
+`dss.users` is a list of users (CSC v2): each is an OAuth2 client
+(client-id/secret) with one or more credentials (id, password, certificate).
+`TokenService` resolves the user from the access token, never from a
+client-supplied value, and `CredentialService.credential(userId, id)` only
+returns a credential the user owns, so one user's token can never list,
+inspect, authorize, or sign with another user's credential. See
+`UserIsolationTest`. Never call them "tenants" again.
 
 ## Tech stack
 
@@ -69,18 +69,18 @@ config.
 
 - The image MUST NOT contain any cert or private key. `src/main/resources/`
   has no `certs/` folder; `.dockerignore` blocks it defensively.
-- Defaults point at `file:/certs/mock-eseal.{crt,key}` (tenant 0); the host
+- Defaults point at `file:/certs/mock-eseal.{crt,key}` (the local user); the host
   mounts its own `certs/` directory read-only into `/certs/` at runtime.
-  Additional tenants mount their own cert/key under their own subpath (see
+  Each credential mounts its own cert/key under its own subpath (see
   README "Configuration").
 - A previous version (≤ 0.2.0) embedded an Altia e-seal key in the JAR —
   that key has been considered compromised and the Docker Hub repo was
   wiped and re-created under a new name. Do not regress.
-- All tenant leaves (Altia, Fikua, ...) are issued under one shared test CA
+- All credential leaves (Altia, Fikua, ...) are issued under one shared test CA
   representing the `fikua-dss` mock TSP (`Fikua DSS Mock TSP Root CA
   (test)`, `O=Fikua`, `organizationIdentifier=VATES-B00000001`) — mirroring
   how a real TSP issues one leaf per subscriber under its own CA, rather
-  than each client bringing its own root. Never issue a new tenant leaf
+  than each client bringing its own root. Never issue a new credential leaf
   under a different/self-signed CA.
 
 ## Git workflow

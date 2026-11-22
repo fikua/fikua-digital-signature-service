@@ -21,25 +21,29 @@ server:
     include-stacktrace: never
     include-binding-errors: never
 
-# CSC / Mock TSP application settings.
-# Each tenant is a separate CSC client (its own OAuth2 client-id/secret,
-# CSC credential-id, and signing certificate). Configure additional tenants
-# by adding DSS_TENANTS_1_*, DSS_TENANTS_2_*, ... env vars (Spring binds
-# indexed env vars onto this list).
+# Users and their credentials (CSC v2). A user is an OAuth2 client
+# (client_credentials) and owns one or more credentials: a certificate with its
+# private key, unlocked with the credential's password. Configured with indexed
+# environment variables, which replace this whole list:
+#   DSS_USERS_<n>_CLIENT_ID, DSS_USERS_<n>_CLIENT_SECRET,
+#   DSS_USERS_<n>_CREDENTIALS_<m>_ID, ..._PASSWORD,
+#   ..._CERTIFICATE_CERT_PATH, ..._CERTIFICATE_KEY_PATH
+# The default is a local development user.
 dss:
-  tenants:
-    - client-id: ${DSS_TENANTS_0_CLIENT_ID:${CLIENT_ID:mock-client}}
-      client-secret: ${DSS_TENANTS_0_CLIENT_SECRET:${CLIENT_SECRET:mock-secret}}
-      credential-id: ${DSS_TENANTS_0_CREDENTIAL_ID:${CREDENTIAL_ID:mock-credential-001}}
-      credential-password: ${DSS_TENANTS_0_CREDENTIAL_PASSWORD:${CREDENTIAL_PASSWORD:mock-password}}
-      certificate:
-        cert-path: ${DSS_TENANTS_0_CERT_PATH:${CERT_PATH:file:/certs/mock-eseal-chain.pem}}
-        key-path: ${DSS_TENANTS_0_KEY_PATH:${KEY_PATH:file:/certs/mock-eseal.key}}
+  users:
+    - client-id: mock-client
+      client-secret: mock-secret
+      credentials:
+        - id: mock-credential-001
+          password: mock-password
+          certificate:
+            cert-path: file:/certs/mock-eseal-chain.pem
+            key-path: file:/certs/mock-eseal.key
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}
 
 # Actuator on an internal management port (Traefik routes only the server
-# port): its health details name tenants and certificates. The public
+# port): its health details name users and certificates. The public
 # GET /health is HealthController, in the OBS-17 format, statuses only.
 management:
   server:
