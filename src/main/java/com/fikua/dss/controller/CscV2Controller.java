@@ -28,11 +28,9 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.TimeZone;
 
 /**
  * CSC API v2 (2.1.0.1) — conformant implementation.
@@ -129,9 +127,6 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_request", "Unknown credential ID"));
         }
 
-        var cert = credential.certificateChain().getFirst();
-        var df = new SimpleDateFormat("yyyyMMddHHmmss'Z'");
-        df.setTimeZone(TimeZone.getTimeZone("UTC"));
 
         var keyInfo = new KeyInfo(
                 "enabled",
@@ -141,11 +136,11 @@ public class CscV2Controller {
         var certInfo = new CertInfo(
                 "valid",
                 credential.certificateChainBase64(),
-                cert.getIssuerX500Principal().getName(),
-                cert.getSerialNumber().toString(16),
-                cert.getSubjectX500Principal().getName(),
-                df.format(cert.getNotBefore()),
-                df.format(cert.getNotAfter())
+                credential.issuerName(),
+                credential.serialNumberHex(),
+                credential.subjectName(),
+                credential.validFrom(),
+                credential.validTo()
         );
         var auth = new Auth(
                 "explicit",

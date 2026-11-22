@@ -23,6 +23,8 @@ import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -171,6 +173,35 @@ public class CredentialService {
             List<String> certificateChainBase64,
             PrivateKey privateKey
     ) {
+        private static final DateTimeFormatter CSC_TIME =
+                DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
+
+        /** The leaf certificate, as credentials/info describes it. */
+        public X509Certificate leaf() {
+            return certificateChain.getFirst();
+        }
+
+        public String issuerName() {
+            return leaf().getIssuerX500Principal().getName();
+        }
+
+        public String subjectName() {
+            return leaf().getSubjectX500Principal().getName();
+        }
+
+        public String serialNumberHex() {
+            return leaf().getSerialNumber().toString(16);
+        }
+
+        /** Validity in the CSC GeneralizedTime form (yyyyMMddHHmmssZ, UTC). */
+        public String validFrom() {
+            return CSC_TIME.format(leaf().getNotBefore().toInstant());
+        }
+
+        public String validTo() {
+            return CSC_TIME.format(leaf().getNotAfter().toInstant());
+        }
+
         /** The signature algorithm credentials/info announces: ecdsa-with-SHA256 (ES256). */
         public String getKeyAlgorithmOid() {
             return Es256.SIGNATURE_OID;
