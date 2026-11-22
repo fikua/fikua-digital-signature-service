@@ -61,6 +61,7 @@ public class AuditEvents {
     static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("outcome");
     static final AttributeKey<String> ERROR_TYPE = AttributeKey.stringKey("error.type");
     static final AttributeKey<String> USER_LABEL = AttributeKey.stringKey("user");
+    private static final String SUCCESS = "success";
 
     /** Reasons for {@code auth.rejected}, with the business operation each one refuses. */
     public enum Reason {
@@ -98,14 +99,14 @@ public class AuditEvents {
 
     public void tokenIssued(String userId) {
         emit("token.issued", Attributes.builder().put(USER, userId));
-        count("token.issue", "success", userId, null);
+        count("token.issue", SUCCESS, userId, null);
     }
 
     public void credentialAuthorized(String userId, String credentialId) {
         emit("credential.authorized", Attributes.builder()
                 .put(USER, userId)
                 .put(CREDENTIAL, credentialId));
-        count("credential.authorize", "success", userId, null);
+        count("credential.authorize", SUCCESS, userId, null);
     }
 
     public void credentialSigned(String userId, String credentialId, int signatureCount, String cscVersion) {
@@ -114,7 +115,7 @@ public class AuditEvents {
                 .put(CREDENTIAL, credentialId)
                 .put(SIGNATURE_COUNT, signatureCount)
                 .put(CSC_VERSION, cscVersion));
-        count("credential.sign", "success", userId, null);
+        count("credential.sign", SUCCESS, userId, null);
     }
 
     /**

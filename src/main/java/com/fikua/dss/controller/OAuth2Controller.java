@@ -62,10 +62,14 @@ public class OAuth2Controller {
             audit.tokenIssued(clientId);
             return ResponseEntity.ok(new TokenResponse(token, "Bearer", properties.tokenTtlSeconds()));
         } catch (SecurityException e) {
-            audit.authRejected(credentials.user(clientId) != null ? clientId : null, Reason.INVALID_CLIENT);
+            audit.authRejected(isKnownUser(clientId) ? clientId : null, Reason.INVALID_CLIENT);
             return ResponseEntity.status(401).body(
                     new ErrorResponse("invalid_client", e.getMessage()));
         }
     }
 
+
+    private boolean isKnownUser(String clientId) {
+        return credentials.user(clientId) != null;
+    }
 }

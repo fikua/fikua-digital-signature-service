@@ -53,18 +53,18 @@ import java.util.TimeZone;
 public class CscV2Controller {
 
     private final TokenService tokenService;
-    private final CredentialService credentialService;
+    private final Callers callers;
     private final SigningService signingService;
     private final AuditEvents audit;
 
     public CscV2Controller(
             TokenService tokenService,
-            CredentialService credentialService,
+            Callers callers,
             SigningService signingService,
             AuditEvents audit
     ) {
         this.tokenService = tokenService;
-        this.credentialService = credentialService;
+        this.callers = callers;
         this.signingService = signingService;
         this.audit = audit;
     }
@@ -109,7 +109,7 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody(required = false) CredentialsListRequest request
     ) {
-        var caller = resolveUser(authHeader);
+        var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
         return ResponseEntity.ok(new CredentialsListResponse(
@@ -121,9 +121,9 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsInfoRequest request
     ) {
-        var caller = resolveUser(authHeader);
+        var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
-        var credential = credentialService.credential(caller.userId(), request.credentialID());
+        var credential = callers.credential(caller, request.credentialID());
         if (credential == null) {
             return ResponseEntity.badRequest().body(
                     new ErrorResponse("invalid_request", "Unknown credential ID"));
@@ -163,7 +163,7 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody CredentialsAuthorizeRequest request
     ) {
-        var caller = resolveUser(authHeader);
+        var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
         var password = extractPassword(request.authData());
@@ -188,13 +188,12 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignHashRequest request
     ) {
-        var caller = resolveUser(authHeader);
+        var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
-        if (!tokenService.validateSad(caller.userId(), request.SAD(), request.credentialID())) {
-            audit.authRejected(caller.userId(), Reason.INVALID_SAD);
-            return ResponseEntity.status(401).body(
-                    new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
+        var credential = callers.authorized(caller, request.SAD(), request.credentialID());
+        if (credential == null) {
+            return Callers.invalidSad();
         }
 
         if (request.hashes() == null || request.hashes().isEmpty()) {
@@ -202,7 +201,6 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_request", "Missing hashes in request"));
         }
 
-        var credential = credentialService.credential(caller.userId(), request.credentialID());
         var signatures = signingService.signHashes(request.hashes(), request.hashAlgorithmOID(), credential);
         audit.credentialSigned(caller.userId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignHashResponse(signatures, null));
@@ -213,30 +211,29 @@ public class CscV2Controller {
             @RequestHeader("Authorization") String authHeader,
             @RequestBody SignDocRequest request
     ) {
-        var caller = resolveUser(authHeader);
+        var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
-        if (!tokenService.validateSad(caller.userId(), request.SAD(), request.credentialID())) {
-            audit.authRejected(caller.userId(), Reason.INVALID_SAD);
-            return ResponseEntity.status(401).body(
-                    new ErrorResponse("invalid_sad", "SAD is invalid or expired"));
+        var credential = callers.authorized(caller, request.SAD(), request.credentialID());
+        if (credential == null) {
+            return Callers.invalidSad();
         }
 
         // CSC v2 input modes: documents (the service builds the AdES signature,
         // SigningService) or documentDigests (precomputed hashes, signed as in signHash).
         if (request.documents() != null && !request.documents().isEmpty()) {
-            return signDocuments(request, caller);
+            return signDocuments(request, caller, credential);
         }
         if (request.documentDigests() != null && !request.documentDigests().isEmpty()) {
-            return signDocumentDigests(request, caller);
+            return signDocumentDigests(request, caller, credential);
         }
 
         return ResponseEntity.badRequest().body(
                 new ErrorResponse("invalid_request", "Either 'documents' or 'documentDigests' must be provided"));
     }
 
-    private ResponseEntity<SignDocResponse> signDocuments(SignDocRequest request, UserResolution caller) {
-        var credential = credentialService.credential(caller.userId(), request.credentialID());
+    private ResponseEntity<SignDocResponse> signDocuments(SignDocRequest request, Callers.Caller caller,
+                                                         CredentialService.Credential credential) {
         var withSignature = new ArrayList<String>();
         var signatureObjects = new ArrayList<String>();
         for (var doc : request.documents()) {
@@ -252,8 +249,8 @@ public class CscV2Controller {
                 signatureObjects.isEmpty() ? null : signatureObjects, null, null));
     }
 
-    private ResponseEntity<SignDocResponse> signDocumentDigests(SignDocRequest request, UserResolution caller) {
-        var credential = credentialService.credential(caller.userId(), request.credentialID());
+    private ResponseEntity<SignDocResponse> signDocumentDigests(SignDocRequest request, Callers.Caller caller,
+                                                               CredentialService.Credential credential) {
         var allHashes = new ArrayList<String>();
         for (var dd : request.documentDigests()) {
             if (dd.hashes() != null) allHashes.addAll(dd.hashes());
@@ -271,20 +268,6 @@ public class CscV2Controller {
         }
     }
 
-    private UserResolution resolveUser(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return UserResolution.error(ResponseEntity.status(401).body(
-                    new ErrorResponse("unauthorized", "Missing Bearer token")));
-        }
-        var userId = tokenService.resolveUserId(authHeader.substring(7));
-        var user = credentialService.user(userId);
-        if (user == null) {
-            audit.authRejected(null, Reason.INVALID_TOKEN);
-            return UserResolution.error(ResponseEntity.status(401).body(
-                    new ErrorResponse("unauthorized", "Invalid or expired access token")));
-        }
-        return UserResolution.ok(user);
-    }
 
     private String extractPassword(List<CredentialsAuthorizeRequest.AuthData> authData) {
         if (authData == null) return null;
@@ -295,18 +278,4 @@ public class CscV2Controller {
                 .orElse(null);
     }
 
-    /** The authenticated user of a request, or the error response when there is none. */
-    private record UserResolution(CredentialService.User user, ResponseEntity<ErrorResponse> error) {
-        static UserResolution ok(CredentialService.User user) {
-            return new UserResolution(user, null);
-        }
-
-        static UserResolution error(ResponseEntity<ErrorResponse> error) {
-            return new UserResolution(null, error);
-        }
-
-        String userId() {
-            return user.id();
-        }
-    }
 }
