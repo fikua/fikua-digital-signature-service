@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -68,9 +69,11 @@ public class DatabaseConfig {
         return new ManagedUsers(JdbcClient.create(dataSource), passwordEncoder, Clock.systemUTC());
     }
 
+    /** After managedUsers, which migrates the database. */
     @Bean
+    @DependsOn("managedUsers")
     @ConditionalOnProperty("dss.keys.master-key")
-    CredentialKeyStore credentialKeyStore(DataSource dataSource, KeysProperties properties, ManagedUsers migrated) {
+    CredentialKeyStore credentialKeyStore(DataSource dataSource, KeysProperties properties) {
         var store = new EncryptedDbKeyStore(JdbcClient.create(dataSource),
                 new MasterKeys(properties.masterKey(), properties.previousMasterKey()));
         var rewrapped = store.rewrap();

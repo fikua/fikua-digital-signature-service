@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -79,9 +78,12 @@ public class CredentialCertificates {
         }
         try {
             Es256.requireP256(leaf);
-            leaf.checkValidity(Date.from(clock.instant()));
-        } catch (IllegalStateException | CertificateException _) {
-            throw new InvalidRequestException("The certificate is not valid now, or not P-256");
+        } catch (IllegalStateException _) {
+            throw new InvalidRequestException("The certificate is not P-256");
+        }
+        var now = clock.instant();
+        if (now.isBefore(leaf.getNotBefore().toInstant()) || now.isAfter(leaf.getNotAfter().toInstant())) {
+            throw new InvalidRequestException("The certificate is not valid now");
         }
         if (leaf.getBasicConstraints() != -1) {
             throw new InvalidRequestException("It is the certificate of a CA");
@@ -106,7 +108,6 @@ public class CredentialCertificates {
             var parameters = new PKIXParameters(anchors);
             // The CRLs of the PKI are for whoever trusts a signature (ADR 0022, section 5).
             parameters.setRevocationEnabled(false);
-            parameters.setDate(Date.from(clock.instant()));
             CertPathValidator.getInstance("PKIX")
                     .validate(CertificateFactory.getInstance("X.509").generateCertPath(path), parameters);
         } catch (GeneralSecurityException _) {
