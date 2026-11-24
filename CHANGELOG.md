@@ -11,8 +11,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `DSS_DATABASE_PASSWORD`; migrated with Flyway at start). The users of the configuration
   still work. A user deactivated in the database is refused at once, also one of the
   configuration and with a token it already has. A credential's password is kept as an
-  Argon2id hash and can be rotated with an overlap. Credentials of the database cannot
-  sign yet (#9). When the database cannot be read, the answer is 503.
+  Argon2id hash and can be rotated with an overlap. When the database cannot be read,
+  the answer is 503.
+- **Key store** (fikua-docs ADR 0022), with `DSS_KEYS_MASTER_KEY`: the service creates the
+  key of a credential, gives its CSR and activates it with the certificate of an accepted
+  CA (`DSS_KEYS_ACCEPTED_CAS_<n>`, PEM files). A private key never comes in or out; it is
+  kept encrypted (AES-256-GCM, a data key per credential) and destroyed when the
+  credential is revoked. There is no API for it yet (#10).
+
+### Changed
+- Every signature is made by the credential's signer, without the in-memory PKCS#12.
 
 ## [0.11.0] - 2026-11-24
 

@@ -112,7 +112,6 @@ dependencies {
     implementation 'io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter'
     // EU DSS (European Commission): signatures and, later, trust lists.
     implementation platform('eu.europa.ec.joinup.sd-dss:dss-bom:6.5.1')
-    implementation 'eu.europa.ec.joinup.sd-dss:dss-token'
     implementation 'eu.europa.ec.joinup.sd-dss:dss-jades'
     implementation 'eu.europa.ec.joinup.sd-dss:dss-cades'
     implementation 'eu.europa.ec.joinup.sd-dss:dss-cms-object'
