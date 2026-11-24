@@ -11,33 +11,25 @@ import eu.europa.esig.dss.enumerations.SignaturePackaging;
 import eu.europa.esig.dss.jades.JAdESSignatureParameters;
 import eu.europa.esig.dss.jades.signature.JAdESService;
 import eu.europa.esig.dss.model.DSSDocument;
-import eu.europa.esig.dss.model.Digest;
 import eu.europa.esig.dss.model.InMemoryDocument;
+import eu.europa.esig.dss.model.SignatureValue;
 import eu.europa.esig.dss.model.ToBeSigned;
+import eu.europa.esig.dss.model.x509.CertificateToken;
+import eu.europa.esig.dss.spi.DSSUtils;
 import eu.europa.esig.dss.spi.validation.CommonCertificateVerifier;
-import eu.europa.esig.dss.token.DSSPrivateKeyEntry;
-import eu.europa.esig.dss.token.KeyStoreSignatureTokenConnection;
-import eu.europa.esig.dss.token.SignatureTokenConnection;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayOutputStream;
-import java.security.KeyStore;
-import java.security.SecureRandom;
-import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Signs with the EU DSS libraries (European Commission, DSS 6.5).
  *
  * <ul>
  *   <li>{@code signHash}: the client computed the SHA-256 digest; the
- *       credential's P-256 key signs it ({@link SignatureTokenConnection#signDigest}),
+ *       credential's P-256 key signs it ({@link CredentialService.DigestSigner}),
  *       ES256 with the signature in ASN.1 DER, as before. Any other hash
  *       algorithm is refused ({@link Es256}).</li>
  *   <li>{@code signDoc}: an AdES signature of the document, JAdES (J) or CAdES
@@ -73,24 +65,21 @@ public class SigningService {
     /** ES256: SHA-256 digests only ({@link Es256}). */
     private static final DigestAlgorithm DEFAULT_DIGEST = DigestAlgorithm.SHA256;
 
-    private final Map<String, SigningKey> keys = new ConcurrentHashMap<>();
     private final JAdESService jades = new JAdESService(new CommonCertificateVerifier());
     private final CAdESService cades = new CAdESService(new CommonCertificateVerifier());
 
     /** signHash: each hash signed with the credential's key; Base64 results (CSC). */
     public List<String> signHashes(List<String> hashesBase64, String hashAlgorithmOid,
                                    CredentialService.Credential credential) {
+        Es256.requireP256(credential.leaf());
         var digestAlgorithm = digestAlgorithm(hashAlgorithmOid);
-        var key = key(credential);
-        var signatureAlgorithm = SignatureAlgorithm.ECDSA_SHA256;
         var signatures = new ArrayList<String>();
         for (var hashB64 : hashesBase64) {
             var hash = decode(hashB64);
             if (hash.length != digestAlgorithm.getSaltLength()) {
                 throw new InvalidRequestException("Hash length does not match hashAlgorithmOID");
             }
-            var value = key.token().signDigest(new Digest(digestAlgorithm, hash), signatureAlgorithm, key.entry());
-            signatures.add(base64(value.getValue()));
+            signatures.add(base64(credential.signer().sign(hash)));
         }
         return signatures;
     }
@@ -98,12 +87,12 @@ public class SigningService {
     /** signDoc, documents mode: one signature per document, in the requested format. */
     public SignedDocument signDocument(byte[] document, String signatureFormat, String conformanceLevel,
                                        CredentialService.Credential credential) {
+        Es256.requireP256(credential.leaf());
         var format = SignatureFormat.of(signatureFormat);
-        var key = key(credential);
         return switch (format) {
             case RAW -> {
                 // Legacy: both fields carried the raw signature before 0.7.0.
-                var raw = base64(key.token().sign(new ToBeSigned(document), DEFAULT_DIGEST, key.entry()).getValue());
+                var raw = base64(credential.signer().sign(DSSUtils.digest(DEFAULT_DIGEST, document)));
                 yield new SignedDocument(raw, raw);
             }
             case JADES -> {
@@ -113,10 +102,10 @@ public class SigningService {
                 parameters.setSignaturePackaging(SignaturePackaging.ENVELOPING);
                 parameters.setJwsSerializationType(JWSSerializationType.COMPACT_SERIALIZATION);
                 parameters.setDigestAlgorithm(DEFAULT_DIGEST);
-                parameters.setSigningCertificate(key.entry().getCertificate());
-                parameters.setCertificateChain(key.entry().getCertificateChain());
+                parameters.setSigningCertificate(new CertificateToken(credential.leaf()));
+                parameters.setCertificateChain(credential.certificateChain().stream().map(CertificateToken::new).toList());
                 var toSign = new InMemoryDocument(document);
-                var value = key.token().sign(jades.getDataToSign(toSign, parameters), DEFAULT_DIGEST, key.entry());
+                var value = sign(jades.getDataToSign(toSign, parameters), credential);
                 yield new SignedDocument(base64(bytes(jades.signDocument(toSign, parameters, value))), null);
             }
             case CADES -> {
@@ -125,13 +114,18 @@ public class SigningService {
                 parameters.setSignatureLevel(SignatureLevel.CAdES_BASELINE_B);
                 parameters.setSignaturePackaging(SignaturePackaging.DETACHED);
                 parameters.setDigestAlgorithm(DEFAULT_DIGEST);
-                parameters.setSigningCertificate(key.entry().getCertificate());
-                parameters.setCertificateChain(key.entry().getCertificateChain());
+                parameters.setSigningCertificate(new CertificateToken(credential.leaf()));
+                parameters.setCertificateChain(credential.certificateChain().stream().map(CertificateToken::new).toList());
                 var toSign = new InMemoryDocument(document);
-                var value = key.token().sign(cades.getDataToSign(toSign, parameters), DEFAULT_DIGEST, key.entry());
+                var value = sign(cades.getDataToSign(toSign, parameters), credential);
                 yield new SignedDocument(null, base64(bytes(cades.signDocument(toSign, parameters, value))));
             }
         };
+    }
+
+    private static SignatureValue sign(ToBeSigned data, CredentialService.Credential credential) {
+        return new SignatureValue(SignatureAlgorithm.ECDSA_SHA256,
+                credential.signer().sign(DSSUtils.digest(DEFAULT_DIGEST, data.getBytes())));
     }
 
     static DigestAlgorithm digestAlgorithm(String oid) {
@@ -182,36 +176,5 @@ public class SigningService {
 
     private static String base64(byte[] value) {
         return Base64.getEncoder().encodeToString(value);
-    }
-
-    private SigningKey key(CredentialService.Credential credential) {
-        return keys.computeIfAbsent(credential.id(), id -> SigningKey.of(credential));
-    }
-
-    /** A DSS token over an in-memory PKCS#12 holding the credential's key and chain. */
-    record SigningKey(SignatureTokenConnection token, DSSPrivateKeyEntry entry) {
-
-        private static final SecureRandom RANDOM = new SecureRandom();
-
-        static SigningKey of(CredentialService.Credential credential) {
-            Es256.requireP256(credential.certificateChain().getFirst());
-            try {
-                // Never leaves the process: it only protects the in-memory PKCS#12.
-                var seed = new byte[16];
-                RANDOM.nextBytes(seed);
-                var password = HexFormat.of().formatHex(seed).toCharArray();
-                var keyStore = KeyStore.getInstance("PKCS12");
-                keyStore.load(null, null);
-                keyStore.setKeyEntry("credential", credential.privateKey(), password,
-                        credential.certificateChain().toArray(new Certificate[0]));
-                var out = new ByteArrayOutputStream();
-                keyStore.store(out, password);
-                var token = new KeyStoreSignatureTokenConnection(out.toByteArray(), "PKCS12",
-                        new KeyStore.PasswordProtection(password));
-                return new SigningKey(token, token.getKeys().getFirst());
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to load the signing key of a credential", e);
-            }
-        }
     }
 }

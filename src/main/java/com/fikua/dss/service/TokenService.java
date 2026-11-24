@@ -4,7 +4,6 @@ import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.web.InvalidRequestException;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.List;
@@ -31,7 +30,7 @@ public class TokenService {
 
     public String issueAccessToken(String clientId, String clientSecret) {
         var user = credentials.user(clientId);
-        if (user == null || !matches(user.clientSecret(), clientSecret)) {
+        if (user == null || !CredentialService.matches(user.clientSecret(), clientSecret)) {
             throw new SecurityException("Invalid client credentials");
         }
         var token = UUID.randomUUID().toString();
@@ -60,7 +59,7 @@ public class TokenService {
         if (credential == null) {
             throw new SecurityException("Unknown credential ID");
         }
-        if (!matches(credential.password(), password)) {
+        if (!credential.password().test(password)) {
             throw new SecurityException("Invalid credential password");
         }
         var sad = UUID.randomUUID().toString();
@@ -104,12 +103,6 @@ public class TokenService {
 
     public void revokeToken(String token) {
         activeTokens.remove(token);
-    }
-
-    /** Constant-time comparison of a configured secret with the one presented. */
-    private static boolean matches(String expected, String presented) {
-        return expected != null && presented != null && MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8));
     }
 
     private record TokenEntry(String userId, Instant expiry) {}

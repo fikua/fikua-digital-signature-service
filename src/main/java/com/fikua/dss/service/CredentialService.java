@@ -2,6 +2,8 @@ package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CredentialProperties;
+import com.fikua.dss.keys.CredentialCertificates;
+import com.fikua.dss.keys.CredentialKeyStore;
 import com.fikua.dss.users.ManagedUsers;
 import jakarta.annotation.PostConstruct;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
@@ -21,8 +23,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.Security;
+import java.security.Signature;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -33,6 +38,8 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * The users of the service and their credentials (CSC v2): those loaded at start
@@ -46,23 +53,26 @@ public class CredentialService {
 
     private final DssProperties properties;
     private final ManagedUsers managed;
+    private final CredentialKeyStore keys;
     private final ResourceLoader resourceLoader = new DefaultResourceLoader();
     private final Map<String, User> users = new LinkedHashMap<>();
     private final Map<String, Credential> credentials = new LinkedHashMap<>();
 
     @Autowired
-    public CredentialService(DssProperties properties, ObjectProvider<ManagedUsers> managed) {
-        this(properties, managed.getIfAvailable());
+    public CredentialService(DssProperties properties, ObjectProvider<ManagedUsers> managed,
+                             ObjectProvider<CredentialKeyStore> keys) {
+        this(properties, managed.getIfAvailable(), keys.getIfAvailable());
     }
 
     /** Only the users of the configuration. */
     public CredentialService(DssProperties properties) {
-        this(properties, (ManagedUsers) null);
+        this(properties, (ManagedUsers) null, null);
     }
 
-    private CredentialService(DssProperties properties, ManagedUsers managed) {
+    private CredentialService(DssProperties properties, ManagedUsers managed, CredentialKeyStore keys) {
         this.properties = properties;
         this.managed = managed;
+        this.keys = keys;
     }
 
     @PostConstruct
@@ -91,6 +101,12 @@ public class CredentialService {
         }
     }
 
+    /** Signs a SHA-256 digest with a credential's key: ES256, ASN.1 DER. */
+    @FunctionalInterface
+    public interface DigestSigner {
+        byte[] sign(byte[] digest);
+    }
+
     /** The user with this client id, or null when there is none or it is not active. */
     public User user(String userId) {
         if (userId == null) return null;
@@ -99,16 +115,40 @@ public class CredentialService {
         var row = managed.user(userId);
         // The database decides whether a user is active, also one of the configuration.
         if (row.isPresent() && !row.get().active()) return null;
-        if (configured != null) return configured;
-        return row.map(u -> new User(u.clientId(), null, List.of())).orElse(null);
+        if (row.isEmpty()) return configured;
+        var all = new ArrayList<>(configured == null ? List.<Credential>of() : configured.credentials());
+        managed.credentials(userId).stream().map(c -> managedCredential(userId, c.id()))
+                .filter(Objects::nonNull).forEach(all::add);
+        return new User(userId, configured == null ? null : configured.clientSecret(), List.copyOf(all));
     }
 
     /** The credential with this id when it belongs to this user; null otherwise. */
     public Credential credential(String userId, String credentialId) {
         var credential = credentialId == null ? null : credentials.get(credentialId);
-        return credential != null && credential.userId().equals(userId) ? credential : null;
+        if (credential != null) {
+            return credential.userId().equals(userId) ? credential : null;
+        }
+        return managedCredential(userId, credentialId);
     }
 
+    /** An active credential of the database, of this user and with its key here; null otherwise. */
+    private Credential managedCredential(String userId, String credentialId) {
+        if (managed == null || keys == null || userId == null || credentialId == null) return null;
+        if (managed.credential(credentialId).filter(c -> c.clientId().equals(userId)).isEmpty()) return null;
+        return managed.certificateChain(credentialId).map(CredentialCertificates::parse)
+                .map(chain -> new Credential(credentialId, userId,
+                        presented -> managed.passwordMatches(credentialId, presented), chain, toBase64(chain),
+                        digest -> keys.sign(credentialId, digest)))
+                .orElse(null);
+    }
+
+    /** Constant-time comparison of a configured secret with the one presented. */
+    static boolean matches(String expected, String presented) {
+        return expected != null && presented != null && MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Those of the configuration. */
     public Collection<Credential> allCredentials() {
         return credentials.values();
     }
@@ -190,11 +230,29 @@ public class CredentialService {
     public record Credential(
             String id,
             String userId,
-            String password,
+            Predicate<String> password,
             List<X509Certificate> certificateChain,
             List<String> certificateChainBase64,
-            PrivateKey privateKey
+            DigestSigner signer
     ) {
+        /** One of the configuration: its password and key are in the process. */
+        public Credential(String id, String userId, String password, List<X509Certificate> certificateChain,
+                          List<String> certificateChainBase64, PrivateKey privateKey) {
+            this(id, userId, presented -> matches(password, presented), certificateChain, certificateChainBase64,
+                    digest -> sign(privateKey, digest));
+        }
+
+        private static byte[] sign(PrivateKey privateKey, byte[] digest) {
+            try {
+                var signature = Signature.getInstance("NONEwithECDSA");
+                signature.initSign(privateKey);
+                signature.update(digest);
+                return signature.sign();
+            } catch (GeneralSecurityException e) {
+                throw new IllegalStateException("Failed to sign", e);
+            }
+        }
+
         private static final DateTimeFormatter CSC_TIME =
                 DateTimeFormatter.ofPattern("yyyyMMddHHmmss'Z'").withZone(ZoneOffset.UTC);
 

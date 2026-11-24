@@ -95,6 +95,9 @@ All settings via environment variables. The container does **not** ship with any
 | `DSS_OAUTH_AUDIENCE` | | The audience those tokens must carry (required with an issuer) |
 | `DSS_DATABASE_URL` | | JDBC URL of the PostgreSQL database of users and credentials; unset, only the users of the configuration |
 | `DSS_DATABASE_USERNAME`, `DSS_DATABASE_PASSWORD` | | Its role, owner of the schema |
+| `DSS_KEYS_MASTER_KEY` | | Master key of the key store, 32 random bytes in Base64 (`openssl rand -base64 32`); unset, no key store |
+| `DSS_KEYS_PREVIOUS_MASTER_KEY` | | The one it replaces, while it is being changed |
+| `DSS_KEYS_ACCEPTED_CAS_<n>` | | PEM files with the CAs whose certificates are installed (`file:/certs/...`) |
 
 A token of the authorization server acts as the user whose `client-id` is its `azp`.
 
@@ -170,6 +173,12 @@ curl -X PUT http://localhost:8080/internal/signing/config \
       }
     }'
 ```
+
+## Key store
+
+The service creates the keys of the credentials in its database and they never leave it (fikua-docs ADR 0022): there is no import and no export. A copy of the database is useless without the master key, and without the master key **no key can be recovered**: keep a copy of it apart from both.
+
+To change the master key without stopping: set the new one as `DSS_KEYS_MASTER_KEY` and the old one as `DSS_KEYS_PREVIOUS_MASTER_KEY`, and restart. At start the data keys are encrypted again with the new one (the log says how many); the credentials' keys do not change. Then remove the old one and restart. Backups made before still need the old one.
 
 ## Signing flow
 

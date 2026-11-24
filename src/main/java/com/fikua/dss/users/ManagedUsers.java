@@ -5,11 +5,15 @@ import com.fikua.dss.users.ManagedUser.Environment;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.X509Certificate;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -61,6 +65,50 @@ public class ManagedUsers {
     public List<ManagedCredential> credentials(String clientId) {
         return jdbc.sql("select " + CREDENTIAL_COLUMNS + " from dss_credential where client_id = :id order by id")
                 .param("id", clientId).query(ManagedUsers::toCredential).list();
+    }
+
+    public Optional<ManagedCredential> credential(String id) {
+        return jdbc.sql("select " + CREDENTIAL_COLUMNS + " from dss_credential where id = :id")
+                .param("id", id).query(ManagedUsers::toCredential).optional();
+    }
+
+    /** The certificate chain in use of an active credential, PEM, leaf first. */
+    public Optional<String> certificateChain(String id) {
+        return jdbc.sql("""
+                        select k.chain_pem from dss_credential_certificate k
+                        join dss_credential c on c.id = k.credential_id
+                        where c.id = :id and c.status = 'active' order by k.id desc limit 1""")
+                .param("id", id).query(String.class).optional();
+    }
+
+    /** Puts a certificate in use and activates the credential. False when it does not exist or is revoked. */
+    boolean installCertificate(String id, List<X509Certificate> chain) {
+        var active = jdbc.sql("update dss_credential set status = 'active', updated_at = :now "
+                        + "where id = :id and status <> 'revoked'")
+                .param("now", now()).param("id", id).update() == 1;
+        if (active) {
+            jdbc.sql("insert into dss_credential_certificate (credential_id, chain_pem, not_after, installed_at) "
+                            + "values (:id, :pem, :notAfter, :now)")
+                    .param("id", id).param("pem", pem(chain))
+                    .param("notAfter", Timestamp.from(chain.getFirst().getNotAfter().toInstant()))
+                    .param("now", now()).update();
+        }
+        return active;
+    }
+
+    private static String pem(List<X509Certificate> chain) {
+        var pem = new StringBuilder();
+        for (var certificate : chain) {
+            try {
+                pem.append("-----BEGIN CERTIFICATE-----\n")
+                        .append(Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+                                .encodeToString(certificate.getEncoded()))
+                        .append("\n-----END CERTIFICATE-----\n");
+            } catch (CertificateEncodingException e) {
+                throw new IllegalStateException("Failed to encode a certificate", e);
+            }
+        }
+        return pem.toString();
     }
 
     /** A new credential, pending until it has a certificate. */
