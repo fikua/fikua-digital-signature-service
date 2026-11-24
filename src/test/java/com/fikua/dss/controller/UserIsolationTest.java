@@ -60,7 +60,7 @@ class UserIsolationTest {
     @Autowired ObjectMapper mapper;
     @Autowired TokenService tokenService;
 
-    private String bearerFor(String clientId, String secret) {
+    String bearerFor(String clientId, String secret) {
         return "Bearer " + tokenService.issueAccessToken(clientId, secret);
     }
 
