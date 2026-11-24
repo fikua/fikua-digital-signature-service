@@ -68,7 +68,7 @@ Signing uses the European Commission's DSS libraries (`dss-token`, `dss-jades`, 
 - **signDoc**, `documents` mode: `signature_format` `J` returns an enveloping JAdES-B-B (compact JWS) in `DocumentWithSignature`; `C` a detached CAdES-B-B in `SignatureObject`. Only `AdES-B-B` is produced (no timestamps). Without `signature_format`, the raw signature of the document in both fields (the pre-0.7.0 behaviour). `P` and `X` answer 400.
 - **signDoc**, `documentDigests` mode: signed as in signHash.
 
-The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.json`](csc_openapi_1.0.3.0.json) and [`csc_openapi_2.1.0.1.yaml`](csc_openapi_2.1.0.1.yaml). The published v2.1.0.1 spec has internal inconsistencies between `required` lists and `properties` blocks (e.g. `input-signatures-signhash.required` lists `hash` but `properties` only defines `hashes`); this implementation follows `properties` consistently. See [`TD-ISSUER-CSC-V2-CONFORMANCE.md`](TD-ISSUER-CSC-V2-CONFORMANCE.md) for the Issuer-side migration plan to conformant v1/v2 request bodies.
+The reference OpenAPI specs are bundled in this repo at [`csc_openapi_1.0.3.0.json`](csc_openapi_1.0.3.0.json) and [`csc_openapi_2.1.0.1.yaml`](csc_openapi_2.1.0.1.yaml). The published v2.1.0.1 spec has internal inconsistencies between `required` lists and `properties` blocks (e.g. `input-signatures-signhash.required` lists `hash` but `properties` only defines `hashes`); this implementation follows `properties` consistently.
 
 ### Observability and operations
 
@@ -241,7 +241,7 @@ Conventional Commits, squash-merge to `main`. PRs welcome — please keep mock-m
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE) and, for third-party software, [NOTICE](NOTICE).
 
 ## References
 
