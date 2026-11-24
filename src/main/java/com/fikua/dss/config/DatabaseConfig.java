@@ -4,6 +4,8 @@ import com.fikua.dss.keys.CredentialCertificates;
 import com.fikua.dss.keys.CredentialKeyStore;
 import com.fikua.dss.keys.EncryptedDbKeyStore;
 import com.fikua.dss.keys.MasterKeys;
+import com.fikua.dss.users.ListSignerCommand;
+import com.fikua.dss.users.ListSigners;
 import com.fikua.dss.users.ManagedCredentials;
 import com.fikua.dss.users.ManagedUsers;
 import com.zaxxer.hikari.HikariDataSource;
@@ -17,6 +19,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.core.env.Environment;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
@@ -91,8 +94,22 @@ public class DatabaseConfig {
         var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
         return new ManagedCredentials(users, keys,
                 new CredentialCertificates(keys, acceptedCas(properties), Clock.systemUTC()), transaction,
-                id -> configuration.users() != null && configuration.users().stream()
-                        .flatMap(u -> u.credentials().stream()).anyMatch(c -> c.id().equals(id)));
+                id -> isConfigured(configuration, id));
+    }
+
+    /** Only while the operator's command runs: the service never has it. */
+    @Bean
+    @ConditionalOnProperty(name = "dss.command", havingValue = ListSignerCommand.NAME)
+    ListSignerCommand listSignerCommand(ManagedUsers users, CredentialKeyStore keys, DataSource dataSource,
+                                        DssProperties configuration, Environment environment) {
+        var transaction = new TransactionTemplate(new DataSourceTransactionManager(dataSource));
+        return new ListSignerCommand(new ListSigners(users, keys, transaction,
+                id -> isConfigured(configuration, id), Clock.systemUTC()), environment, System.out);
+    }
+
+    private static boolean isConfigured(DssProperties configuration, String credentialId) {
+        return configuration.users() != null && configuration.users().stream()
+                .flatMap(u -> u.credentials().stream()).anyMatch(c -> c.id().equals(credentialId));
     }
 
     private static List<X509Certificate> acceptedCas(KeysProperties properties) {

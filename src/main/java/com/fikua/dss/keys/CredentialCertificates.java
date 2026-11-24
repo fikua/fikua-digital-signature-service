@@ -3,19 +3,13 @@ package com.fikua.dss.keys;
 import com.fikua.dss.service.Es256;
 import com.fikua.dss.web.InvalidRequestException;
 import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.MessageDigest;
 import java.security.cert.CertPathValidator;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -50,7 +44,7 @@ public class CredentialCertificates {
         try {
             var publicKey = SubjectPublicKeyInfo.getInstance(keys.publicKey(credentialId).getEncoded());
             var request = new PKCS10CertificationRequestBuilder(new X500Name(subject), publicKey)
-                    .build(new KeyStoreSigner(credentialId));
+                    .build(new KeyStoreContentSigner(keys, credentialId));
             var body = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
                     .encodeToString(request.getEncoded());
             return "-----BEGIN CERTIFICATE REQUEST-----\n" + body + "\n-----END CERTIFICATE REQUEST-----\n";
@@ -128,36 +122,6 @@ public class CredentialCertificates {
             return chain;
         } catch (CertificateException _) {
             throw new InvalidRequestException("No certificate in PEM");
-        }
-    }
-
-    /** Signs what BouncyCastle writes with the credential's key, which stays in the key store. */
-    private final class KeyStoreSigner implements ContentSigner {
-
-        private final String credentialId;
-        private final ByteArrayOutputStream content = new ByteArrayOutputStream();
-
-        private KeyStoreSigner(String credentialId) {
-            this.credentialId = credentialId;
-        }
-
-        @Override
-        public AlgorithmIdentifier getAlgorithmIdentifier() {
-            return new DefaultSignatureAlgorithmIdentifierFinder().find("SHA256withECDSA");
-        }
-
-        @Override
-        public OutputStream getOutputStream() {
-            return content;
-        }
-
-        @Override
-        public byte[] getSignature() {
-            try {
-                return keys.sign(credentialId, MessageDigest.getInstance("SHA-256").digest(content.toByteArray()));
-            } catch (GeneralSecurityException e) {
-                throw new IllegalStateException(e);
-            }
         }
     }
 }
