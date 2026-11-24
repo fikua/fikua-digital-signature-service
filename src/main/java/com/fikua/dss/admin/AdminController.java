@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Objects;
 
 /** The administration API. {@link AdminFilter} has already let the administrator in. */
 @RestController
@@ -41,7 +42,7 @@ public class AdminController {
     /** No operation without an administrator, even if the filter were not there. */
     @ModelAttribute
     void requireAdministrator(@RequestAttribute(ADMIN) Administrator by) {
-        // The attribute is the check: without it the request is refused.
+        Objects.requireNonNull(by);
     }
 
     @GetMapping("/me")
@@ -136,7 +137,7 @@ public class AdminController {
 
     /** Two requests for the same id at the same time. */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> conflict(DataIntegrityViolationException e) {
+    public ResponseEntity<ErrorResponse> conflict() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("conflict", "There is something with that id"));
     }
