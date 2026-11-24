@@ -98,6 +98,8 @@ public class DatabaseConfig {
     }
 
     /** Only while the operator's command runs: the service never has it. */
+    // To the operator's terminal and not to a log: it prints a password.
+    @SuppressWarnings("java:S106")
     @Bean
     @ConditionalOnProperty(name = "dss.command", havingValue = ListSignerCommand.NAME)
     ListSignerCommand listSignerCommand(ManagedUsers users, CredentialKeyStore keys, DataSource dataSource,

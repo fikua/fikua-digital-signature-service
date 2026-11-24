@@ -41,6 +41,7 @@ public class ListSigners {
     static final String TSL_SIGNING = "0.4.0.2231.3.0";
     private static final int YEARS = 5;
     private static final int SERIAL_BITS = 128;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final ManagedUsers users;
     private final CredentialKeyStore keys;
@@ -85,7 +86,7 @@ public class ListSigners {
             var key = SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
             var from = clock.instant().truncatedTo(ChronoUnit.SECONDS);
             var to = from.atZone(ZoneOffset.UTC).plusYears(YEARS).toInstant();
-            var builder = new X509v3CertificateBuilder(name, new BigInteger(SERIAL_BITS, new SecureRandom()).setBit(0),
+            var builder = new X509v3CertificateBuilder(name, new BigInteger(SERIAL_BITS, RANDOM).setBit(0),
                     Date.from(from), Date.from(to), name, key)
                     .addExtension(Extension.basicConstraints, true, new BasicConstraints(false))
                     .addExtension(Extension.keyUsage, true,

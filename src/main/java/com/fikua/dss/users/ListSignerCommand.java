@@ -20,6 +20,7 @@ public class ListSignerCommand implements ApplicationRunner {
     public static final String NAME = "create-list-signer";
     private static final String PREFIX = "dss.list-signer.";
     private static final int PASSWORD_BYTES = 32;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final ListSigners signers;
     private final Environment environment;
@@ -33,9 +34,9 @@ public class ListSignerCommand implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments arguments) {
-        var random = new byte[PASSWORD_BYTES];
-        new SecureRandom().nextBytes(random);
-        var password = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
+        var bytes = new byte[PASSWORD_BYTES];
+        RANDOM.nextBytes(bytes);
+        var password = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         var id = required("credential");
         X509Certificate certificate = signers.create(id, required("user"), password,
                 new Subject(required("country"), required("organisation"), required("common-name")));
