@@ -17,7 +17,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   key of a credential, gives its CSR and activates it with the certificate of an accepted
   CA (`DSS_KEYS_ACCEPTED_CAS_<n>`, PEM files). A private key never comes in or out; it is
   kept encrypted (AES-256-GCM, a data key per credential) and destroyed when the
-  credential is revoked. There is no API for it yet (#10).
+  credential is revoked.
+- **Administration API** (`/admin/v1`, #10) on a port of its own (`DSS_ADMIN_PORT`), for
+  administrators with a token of an issuer and a group. It creates a user whole (its
+  Keycloak client, its first credential and its key), rotates secrets and passwords,
+  deactivates users at once, gives CSRs, installs certificates and revokes. Secrets are
+  only in the answer that creates them. Every operation is audited.
 - Operator command `create-list-signer`: a credential with the self-signed certificate of
   a trusted list signer (ADR 0022). The service itself cannot create one.
 

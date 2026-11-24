@@ -39,6 +39,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -146,6 +147,15 @@ public class CredentialService {
     static boolean matches(String expected, String presented) {
         return expected != null && presented != null && MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public Set<String> configuredUserIds() {
+        return Set.copyOf(users.keySet());
+    }
+
+    public List<Credential> configuredCredentials(String userId) {
+        var user = users.get(userId);
+        return user == null ? List.of() : user.credentials();
     }
 
     /** Those of the configuration. */
