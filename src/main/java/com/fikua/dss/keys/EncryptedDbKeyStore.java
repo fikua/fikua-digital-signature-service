@@ -87,12 +87,7 @@ public class EncryptedDbKeyStore implements CredentialKeyStore {
 
     @Override
     public PublicKey publicKey(String credentialId) {
-        var row = row(credentialId).orElseThrow(() -> new IllegalStateException("No key for " + credentialId));
-        try {
-            return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(row.publicKey()));
-        } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Failed to read a public key", e);
-        }
+        return row(credentialId).orElseThrow(() -> new IllegalStateException("No key for " + credentialId)).publicKey();
     }
 
     @Override
@@ -123,7 +118,7 @@ public class EncryptedDbKeyStore implements CredentialKeyStore {
         return done;
     }
 
-    private record Row(String kekId, Encrypted dek, Encrypted key, byte[] publicKey) {}
+    private record Row(String kekId, Encrypted dek, Encrypted key, PublicKey publicKey) {}
 
     private Optional<Row> row(String credentialId) {
         return jdbc.sql("""
@@ -136,7 +131,15 @@ public class EncryptedDbKeyStore implements CredentialKeyStore {
         return new Row(rs.getString("kek_id"),
                 new Encrypted(rs.getBytes("dek_nonce"), rs.getBytes("encrypted_dek")),
                 new Encrypted(rs.getBytes("key_nonce"), rs.getBytes("encrypted_key")),
-                rs.getBytes("public_key"));
+                publicKey(rs.getBytes("public_key")));
+    }
+
+    private static PublicKey publicKey(byte[] encoded) {
+        try {
+            return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Failed to read a public key", e);
+        }
     }
 
     private static String dekContext(String credentialId) {

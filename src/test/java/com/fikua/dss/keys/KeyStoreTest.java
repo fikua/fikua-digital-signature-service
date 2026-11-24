@@ -116,8 +116,10 @@ class KeyStoreTest {
     @Test
     void signsWithTheCredentialsKey() throws Exception {
         assertTrue(verifies(keys.publicKey(ID), keys.sign(ID, digest())));
-        assertThrows(IllegalArgumentException.class, () -> keys.sign(ID, new byte[20]));
-        assertThrows(IllegalStateException.class, () -> keys.sign("nope", digest()));
+        var digest = digest();
+        var tooShort = new byte[20];
+        assertThrows(IllegalArgumentException.class, () -> keys.sign(ID, tooShort));
+        assertThrows(IllegalStateException.class, () -> keys.sign("nope", digest));
     }
 
     @Test
@@ -127,31 +129,33 @@ class KeyStoreTest {
     }
 
     @Test
-    void anAlteredOrMovedKeyDoesNotSign() {
+    void anAlteredOrMovedKeyDoesNotSign() throws Exception {
+        var digest = digest();
         credentials.create("altia-dev-003", "altia-dev", "secret");
         jdbc.sql("""
                 update dss_credential_key a set encrypted_dek = b.encrypted_dek, dek_nonce = b.dek_nonce,
                     encrypted_key = b.encrypted_key, key_nonce = b.key_nonce
                 from dss_credential_key b where a.credential_id = :a and b.credential_id = :b""")
                 .param("a", ID).param("b", "altia-dev-003").update();
-        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest()));
+        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest));
 
         jdbc.sql("update dss_credential_key set encrypted_key = set_byte(encrypted_key, 5, 255 - get_byte(encrypted_key, 5)) "
                 + "where credential_id = 'altia-dev-003'").update();
-        assertThrows(IllegalStateException.class, () -> keys.sign("altia-dev-003", digest()));
+        assertThrows(IllegalStateException.class, () -> keys.sign("altia-dev-003", digest));
     }
 
     @Test
     void theMasterKeyIsChangedWithoutChangingTheKeys() throws Exception {
         var before = keys.publicKey(ID);
+        var digest = digest();
         var changing = new EncryptedDbKeyStore(jdbc, new MasterKeys(MasterKeysTest.key(2), MasterKeysTest.key(1)));
         assertEquals(1, changing.rewrap());
         assertEquals(0, changing.rewrap());
 
         var after = new EncryptedDbKeyStore(jdbc, new MasterKeys(MasterKeysTest.key(2), null));
         assertArrayEquals(before.getEncoded(), after.publicKey(ID).getEncoded());
-        assertTrue(verifies(before, after.sign(ID, digest())));
-        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest()));
+        assertTrue(verifies(before, after.sign(ID, digest)));
+        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest));
     }
 
     // -- CSR and certificate ---------------------------------------------------
@@ -216,11 +220,12 @@ class KeyStoreTest {
     // -- life ------------------------------------------------------------------
 
     @Test
-    void revokingDestroysTheKey() {
+    void revokingDestroysTheKey() throws Exception {
+        var digest = digest();
         credentials.install(ID, pem(ca.issue(keys.publicKey(ID))));
         credentials.revoke(ID);
         assertEquals(Status.REVOKED, status());
-        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest()));
+        assertThrows(IllegalStateException.class, () -> keys.sign(ID, digest));
         assertTrue(users.certificateChain(ID).isEmpty());
         assertThrows(InvalidRequestException.class, () -> credentials.csr(ID, "CN=x"));
         assertThrows(InvalidRequestException.class, () -> credentials.install(ID, "x"));

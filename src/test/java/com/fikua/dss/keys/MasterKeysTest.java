@@ -23,7 +23,8 @@ class MasterKeysTest {
         var keys = new MasterKeys(key(1), null);
         var encrypted = keys.encrypt("data".getBytes(), "a");
         assertArrayEquals("data".getBytes(), keys.decrypt(keys.currentId(), encrypted, "a"));
-        assertThrows(IllegalStateException.class, () -> keys.decrypt(keys.currentId(), encrypted, "b"));
+        var id = keys.currentId();
+        assertThrows(IllegalStateException.class, () -> keys.decrypt(id, encrypted, "b"));
     }
 
     @Test
@@ -34,7 +35,8 @@ class MasterKeysTest {
         assertNotEquals(old.currentId(), current.currentId());
         assertArrayEquals("data".getBytes(), current.decrypt(old.currentId(), encrypted, "a"));
         var other = new MasterKeys(key(3), "");
-        assertThrows(IllegalStateException.class, () -> other.decrypt(old.currentId(), encrypted, "a"));
+        var oldId = old.currentId();
+        assertThrows(IllegalStateException.class, () -> other.decrypt(oldId, encrypted, "a"));
     }
 
     @Test

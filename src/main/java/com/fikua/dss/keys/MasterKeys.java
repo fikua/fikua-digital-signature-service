@@ -35,7 +35,24 @@ public final class MasterKeys {
         }
     }
 
-    public record Encrypted(byte[] nonce, byte[] data) {}
+    /** A class and not a record: two are never compared. */
+    public static final class Encrypted {
+        private final byte[] nonce;
+        private final byte[] data;
+
+        Encrypted(byte[] nonce, byte[] data) {
+            this.nonce = nonce;
+            this.data = data;
+        }
+
+        byte[] nonce() {
+            return nonce;
+        }
+
+        byte[] data() {
+            return data;
+        }
+    }
 
     public String currentId() {
         return currentId;
