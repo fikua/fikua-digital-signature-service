@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-11-24
+
+### Changed
+- **CSC conformance** (1.0.3.0 and 2.1.0.1). Signatures are Base64, no longer base64url.
+  `signAlgo` is required in signHash and must be ES256. An authorization signs once
+  (`numSignatures` 1) and, when it names hashes, only those; the v1 names `hash` and
+  `hashAlgo` are accepted in v2 `credentials/authorize`. `credentials/info` and
+  `credentials/list` honour `certificates`, `certInfo`, `authInfo`, `credentialInfo` and
+  `onlyValid`, and tell an expired certificate. `info` announces only what there is, with
+  the authorization server as `oauth2Issuer`; v1 `info` is also a POST. Absent values are
+  left out instead of null.
+
+### Fixed
+- Stricter check of what an authorization (SAD) allows.
+
 ## [0.10.0] - 2026-11-24
 
 ### Added

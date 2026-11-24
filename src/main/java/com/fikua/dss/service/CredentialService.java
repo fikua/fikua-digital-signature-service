@@ -203,6 +203,12 @@ public class CredentialService {
         }
 
         /** The signature algorithm credentials/info announces: ecdsa-with-SHA256 (ES256). */
+        /** CSC cert.status. */
+        public String certificateStatus() {
+            return java.time.Instant.now().isAfter(certificateChain().getFirst().getNotAfter().toInstant())
+                    ? "expired" : "valid";
+        }
+
         public String getKeyAlgorithmOid() {
             return Es256.SIGNATURE_OID;
         }

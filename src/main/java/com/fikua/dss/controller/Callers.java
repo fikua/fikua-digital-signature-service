@@ -11,6 +11,8 @@ import com.fikua.dss.service.TokenService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Who is calling a CSC endpoint, from its bearer token, and which of its
  * credentials a SAD authorizes. Shared by the v1 and v2 controllers.
@@ -63,12 +65,12 @@ class Callers {
     }
 
     /**
-     * The credential a valid SAD of this caller authorizes (the SAD is spent),
-     * or null; a refusal is audited.
+     * The credential a valid SAD of this caller authorizes for these signatures
+     * (the SAD is spent), or null; a refusal is audited.
      */
-    Credential authorized(Caller caller, String sad, String credentialId) {
+    Credential authorized(Caller caller, String sad, String credentialId, int signatures, List<byte[]> hashes) {
         var credential = credential(caller, credentialId);
-        if (credential == null || !tokenService.validateSad(caller.userId(), sad, credentialId)) {
+        if (credential == null || !tokenService.spendSad(caller.userId(), sad, credentialId, signatures, hashes)) {
             audit.refused(caller.userId(), Reason.INVALID_SAD);
             return null;
         }

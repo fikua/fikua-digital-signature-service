@@ -77,7 +77,7 @@ public class SigningService {
     private final JAdESService jades = new JAdESService(new CommonCertificateVerifier());
     private final CAdESService cades = new CAdESService(new CommonCertificateVerifier());
 
-    /** signHash: each hash (base64url) signed with the credential's key; base64url results. */
+    /** signHash: each hash signed with the credential's key; Base64 results (CSC). */
     public List<String> signHashes(List<String> hashesBase64, String hashAlgorithmOid,
                                    CredentialService.Credential credential) {
         var digestAlgorithm = digestAlgorithm(hashAlgorithmOid);
@@ -90,7 +90,7 @@ public class SigningService {
                 throw new InvalidRequestException("Hash length does not match hashAlgorithmOID");
             }
             var value = key.token().signDigest(new Digest(digestAlgorithm, hash), signatureAlgorithm, key.entry());
-            signatures.add(Base64.getUrlEncoder().withoutPadding().encodeToString(value.getValue()));
+            signatures.add(base64(value.getValue()));
         }
         return signatures;
     }
@@ -152,7 +152,15 @@ public class SigningService {
         }
     }
 
+    /** The hashes of a request: Base64 (CSC) or base64url, which EUDIStack's issuer sends. */
+    public static List<byte[]> decodeAll(List<String> hashes) {
+        return hashes == null ? List.of() : hashes.stream().map(SigningService::decode).toList();
+    }
+
     private static byte[] decode(String hashB64) {
+        if (hashB64 == null) {
+            throw new InvalidRequestException("Hash is not base64");
+        }
         try {
             return Base64.getUrlDecoder().decode(hashB64);
         } catch (IllegalArgumentException _) {

@@ -107,9 +107,9 @@ class UserIsolationTest {
 
     @Test
     void signHashRejectsASadIssuedToAnotherUser() throws Exception {
-        var sad = tokenService.issueSad("user-b", "cred-b", "pw-b");
+        var sad = tokenService.issueSad("user-b", "cred-b", "pw-b", 1, List.of());
         var req = new SignHashRequest("cred-b", sad, List.of(sha256Base64Url("hello".getBytes())),
-                "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
+                "2.16.840.1.101.3.4.2.1", "1.2.840.10045.4.3.2", null, null, null, null, null);
 
         // A SAD issued to user-b must not be usable with a user-a bearer token.
         mockMvc.perform(post("/csc/v2/signatures/signHash")
@@ -121,9 +121,9 @@ class UserIsolationTest {
 
     @Test
     void signHashSucceedsWhenTokenAndSadBelongToTheSameUser() throws Exception {
-        var sad = tokenService.issueSad("user-b", "cred-b", "pw-b");
+        var sad = tokenService.issueSad("user-b", "cred-b", "pw-b", 1, List.of());
         var req = new SignHashRequest("cred-b", sad, List.of(sha256Base64Url("hello".getBytes())),
-                "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
+                "2.16.840.1.101.3.4.2.1", "1.2.840.10045.4.3.2", null, null, null, null, null);
 
         mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearerFor("user-b", "secret-b"))
@@ -136,9 +136,9 @@ class UserIsolationTest {
     @Test
     void eachCredentialSignsWithItsOwnKey() throws Exception {
         var data = "hello".getBytes();
-        var sad = tokenService.issueSad("user-a", "cred-a2", "pw-a2");
+        var sad = tokenService.issueSad("user-a", "cred-a2", "pw-a2", 1, List.of());
         var req = new SignHashRequest("cred-a2", sad, List.of(sha256Base64Url(data)),
-                "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
+                "2.16.840.1.101.3.4.2.1", "1.2.840.10045.4.3.2", null, null, null, null, null);
 
         var body = mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearerFor("user-a", "secret-a"))
@@ -146,7 +146,7 @@ class UserIsolationTest {
                         .content(mapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        var signature = Base64.getUrlDecoder().decode(mapper.readTree(body).get("signatures").get(0).asString());
+        var signature = Base64.getDecoder().decode(mapper.readTree(body).get("signatures").get(0).asString());
 
         assertTrue(verifies("build/test-certs/other-eseal.crt", data, signature), "signed with cred-a2's key");
         assertFalse(verifies("build/test-certs/mock-eseal.crt", data, signature), "not with cred-a's key");

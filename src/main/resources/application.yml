@@ -3,6 +3,9 @@ spring:
     name: fikua-digital-signature-service
   main:
     banner-mode: off
+  jackson:
+    # An absent value is left out (CSC): its schemas have no nullable fields.
+    default-property-inclusion: non_null
   lifecycle:
     timeout-per-shutdown-phase: 30s
 

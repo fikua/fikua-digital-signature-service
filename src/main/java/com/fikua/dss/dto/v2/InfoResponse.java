@@ -18,14 +18,14 @@ public record InfoResponse(
         Boolean asynchronousOperationMode,
         List<String> methods,
         Boolean validationInfo,
-        List<SignAlgorithm> signAlgorithms,
+        SignAlgorithms signAlgorithms,
         List<String> documentTypes,
         SignatureFormats signature_formats,
         List<String> conformance_levels
 ) {
     public record Oauth2Server(String issuer) {}
 
-    public record SignAlgorithm(String algorithm) {}
+    public record SignAlgorithms(List<String> algos) {}
 
     public record SignatureFormats(
             List<String> formats,

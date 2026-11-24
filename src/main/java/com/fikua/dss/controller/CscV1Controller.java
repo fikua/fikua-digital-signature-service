@@ -1,5 +1,8 @@
 package com.fikua.dss.controller;
 
+import com.fikua.dss.web.InvalidRequestException;
+import com.fikua.dss.service.Es256;
+import com.fikua.dss.dto.v1.InfoRequest;
 import com.fikua.dss.audit.AuditEvents;
 import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.dto.common.ErrorResponse;
@@ -56,6 +59,12 @@ public class CscV1Controller {
         this.audit = audit;
     }
 
+    /** POST is the specification's; GET stays for the clients that use it. */
+    @PostMapping("/info")
+    public ResponseEntity<?> info(@RequestBody(required = false) InfoRequest request) {
+        return info(request == null ? null : request.lang());
+    }
+
     @GetMapping("/info")
     public ResponseEntity<?> info(@RequestParam(value = "lang", required = false) String lang) {
         return ResponseEntity.ok(new InfoResponse(
@@ -65,11 +74,9 @@ public class CscV1Controller {
                 "ES",
                 lang != null ? lang : "en-US",
                 "Mock TSP for development and testing. NOT for production use, NOT qualified.",
-                List.of("basic", "oauth2client"),
+                List.of("oauth2client"),
                 null,
                 List.of(
-                        "auth/login",
-                        "auth/revoke",
                         "credentials/list",
                         "credentials/info",
                         "credentials/authorize",
@@ -111,7 +118,7 @@ public class CscV1Controller {
         );
 
         var certInfo = new CredentialsInfoResponse.CertInfo(
-                "valid",
+                credential.certificateStatus(),
                 credential.certificateChainBase64(),
                 credential.issuerName(),
                 credential.serialNumberHex(),
@@ -141,10 +148,15 @@ public class CscV1Controller {
                     new ErrorResponse("invalid_request", "Missing PIN"));
         }
 
+        if (request.numSignatures() != 1) {
+            throw new InvalidRequestException("numSignatures must be 1");
+        }
+        var hashes = SigningService.decodeAll(request.hash());
         try {
-            var sad = tokenService.issueSad(caller.userId(), request.credentialID(), request.PIN());
+            var sad = tokenService.issueSad(caller.userId(), request.credentialID(), request.PIN(),
+                    request.numSignatures(), hashes);
             audit.credentialAuthorized(caller.userId(), request.credentialID());
-            return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, null));
+            return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, tokenService.sadTtlSeconds()));
         } catch (SecurityException e) {
             audit.refused(caller.userId(), Reason.INVALID_AUTHORIZATION_DATA);
             return ResponseEntity.status(401).body(
@@ -160,7 +172,12 @@ public class CscV1Controller {
         var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
-        var credential = callers.authorized(caller, request.SAD(), request.credentialID());
+        if (request.hash() == null || request.hash().isEmpty()) {
+            throw new InvalidRequestException("Missing hash in request");
+        }
+        Es256.requireSignAlgo(request.signAlgo(), true);
+        var credential = callers.authorized(caller, request.SAD(), request.credentialID(),
+                request.hash().size(), SigningService.decodeAll(request.hash()));
         if (credential == null) {
             return Callers.invalidSad();
         }
