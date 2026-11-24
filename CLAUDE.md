@@ -12,7 +12,9 @@ DSS (Digital Signature Service — European Commission).
 **Mock mode is dev/test only — never deploy to production as a real
 (qualified) TSP.**
 
-**Names.** "Fikua DSS" is this service. "EU DSS" is the European Commission's
+**Names.** The product is **Fikua Sign** (until 2026-11 "Fikua DSS"; the repository,
+image, hostname, realm, audience and configuration keys keep `dss` until they are
+renamed in a task of their own). "EU DSS" is the European Commission's
 library and demonstrations (`esig/dss`), which this service uses and which other
 systems also run on their own. Write one or the other, never "the DSS" alone,
 where both can be meant.
@@ -84,7 +86,7 @@ config.
 - **Today:** all credential leaves are issued under one test CA (`Fikua DSS
   Mock TSP Root CA (test)`) and their keys are mounted as files. Issue no new
   leaf under it.
-- **Target (fikua-docs ADR 0022, proposed; #9):** the Fikua DSS creates the keys
+- **Target (fikua-docs ADR 0022, proposed; #9):** Fikua Sign creates the keys
   of its credentials, gives a CSR and activates the credential with the
   certificate of an issuing CA that is outside the service. It never imports or
   returns a private key: no PKCS#12 upload, no `loadPrivateKey`. The current
