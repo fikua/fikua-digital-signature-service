@@ -1,5 +1,8 @@
 package com.fikua.dss.controller;
 
+import java.util.stream.Stream;
+import com.fikua.dss.service.Es256;
+import com.fikua.dss.config.OAuthProperties;
 import com.fikua.dss.audit.AuditEvents;
 import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.dto.common.ErrorResponse;
@@ -50,36 +53,44 @@ import java.util.List;
 @RequestMapping("/csc/v2")
 public class CscV2Controller {
 
+    /** Signatures one authorization allows (CSC multisign). */
+    private static final int MULTISIGN = 1;
+    private static final String VALID = "valid";
+    private static final String LANG = "en-US";
+
     private final TokenService tokenService;
     private final Callers callers;
     private final SigningService signingService;
     private final AuditEvents audit;
+    private final OAuthProperties oauth;
 
     public CscV2Controller(
             TokenService tokenService,
             Callers callers,
             SigningService signingService,
-            AuditEvents audit
+            AuditEvents audit,
+            OAuthProperties oauth
     ) {
         this.tokenService = tokenService;
         this.callers = callers;
         this.signingService = signingService;
         this.audit = audit;
+        this.oauth = oauth;
     }
 
     @PostMapping("/info")
     public ResponseEntity<?> info(@RequestBody(required = false) Object body) {
         return ResponseEntity.ok(new InfoResponse(
-                "2.0.0.0",
+                "2.1.0.1",
                 "EUDIStack Mock TSP",
                 "",
                 "ES",
                 "en-US",
                 "Mock TSP for development and testing. NOT for production use, NOT qualified.",
-                List.of("basic", "oauth2client"),
+                List.of("oauth2client"),
                 null,
                 null,
-                null,
+                oauth.enabled() ? oauth.issuer() : null,
                 false,
                 List.of("SHA-256"),
                 false,
@@ -92,7 +103,7 @@ public class CscV2Controller {
                         "signatures/signDoc"
                 ),
                 false,
-                null,
+                new InfoResponse.SignAlgorithms(List.of(Es256.SIGNATURE_OID)),
                 List.of("PDF", "JSON"),
                 new InfoResponse.SignatureFormats(
                         List.of("C", "J"),
@@ -110,8 +121,16 @@ public class CscV2Controller {
         var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
+        var onlyValid = request != null && Boolean.TRUE.equals(request.onlyValid());
+        var listed = caller.user().credentials().stream()
+                .filter(c -> !onlyValid || VALID.equals(c.certificateStatus())).toList();
+        var infos = request != null && Boolean.TRUE.equals(request.credentialInfo())
+                ? listed.stream().map(c -> new CredentialsListResponse.CredentialInfo(c.id(), keyInfo(c),
+                        certInfo(c, request.certificates(), request.certInfo()), auth(request.authInfo()),
+                        MULTISIGN, LANG)).toList()
+                : null;
         return ResponseEntity.ok(new CredentialsListResponse(
-                caller.user().credentialIds(), null, null));
+                listed.stream().map(CredentialService.Credential::id).toList(), infos, onlyValid ? true : null));
     }
 
     @PostMapping("/credentials/info")
@@ -128,29 +147,39 @@ public class CscV2Controller {
         }
 
 
-        var keyInfo = new KeyInfo(
-                "enabled",
-                List.of(credential.getKeyAlgorithmOid()),
-                credential.getKeyLength()
-        );
-        var certInfo = new CertInfo(
-                "valid",
-                credential.certificateChainBase64(),
-                credential.issuerName(),
-                credential.serialNumberHex(),
-                credential.subjectName(),
-                credential.validFrom(),
-                credential.validTo()
-        );
-        var auth = new Auth(
-                "explicit",
-                "PIN",
-                List.of(new Auth.AuthObject(
-                        "Password", "PIN", "N", null,
-                        "PIN", "Please enter the signature PIN")));
-
         return ResponseEntity.ok(new CredentialsInfoResponse(
-                null, null, keyInfo, certInfo, auth, "1", 1, "en-US"));
+                null, null, keyInfo(credential),
+                certInfo(credential, request.certificates(), request.certInfo()),
+                auth(request.authInfo()), "1", MULTISIGN, LANG));
+    }
+
+    private static KeyInfo keyInfo(CredentialService.Credential credential) {
+        return new KeyInfo("enabled", List.of(credential.getKeyAlgorithmOid()), credential.getKeyLength());
+    }
+
+    /** {@code certificates}: none, single (the default) or chain; the names and dates only with certInfo. */
+    private static CertInfo certInfo(CredentialService.Credential credential, String certificates, Boolean certInfo) {
+        var chain = credential.certificateChainBase64();
+        var returned = switch (certificates == null ? "single" : certificates) {
+            case "none" -> null;
+            case "single" -> List.of(chain.getFirst());
+            case "chain" -> chain;
+            default -> throw new InvalidRequestException("certificates must be none, single or chain");
+        };
+        var details = Boolean.TRUE.equals(certInfo);
+        return new CertInfo(credential.certificateStatus(), returned,
+                details ? credential.issuerName() : null,
+                details ? credential.serialNumberHex() : null,
+                details ? credential.subjectName() : null,
+                details ? credential.validFrom() : null,
+                details ? credential.validTo() : null);
+    }
+
+    private static Auth auth(Boolean authInfo) {
+        return Boolean.TRUE.equals(authInfo)
+                ? new Auth("explicit", "AND", List.of(new Auth.AuthObject(
+                        "Password", "password", "A", null, "Password", "The credential's password")))
+                : null;
     }
 
     @PostMapping("/credentials/authorize")
@@ -167,10 +196,13 @@ public class CscV2Controller {
                     new ErrorResponse("invalid_request", "Missing password in authData"));
         }
 
+        requireNumSignatures(request.numSignatures());
+        var hashes = SigningService.decodeAll(request.hashes());
         try {
-            var sad = tokenService.issueSad(caller.userId(), request.credentialID(), password);
+            var sad = tokenService.issueSad(caller.userId(), request.credentialID(), password,
+                    request.numSignatures(), hashes);
             audit.credentialAuthorized(caller.userId(), request.credentialID());
-            return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, null));
+            return ResponseEntity.ok(new CredentialsAuthorizeResponse(sad, tokenService.sadTtlSeconds()));
         } catch (SecurityException e) {
             audit.refused(caller.userId(), Reason.INVALID_AUTHORIZATION_DATA);
             return ResponseEntity.status(401).body(
@@ -185,17 +217,16 @@ public class CscV2Controller {
     ) {
         var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
-
-        var credential = callers.authorized(caller, request.SAD(), request.credentialID());
-        if (credential == null) {
-            return Callers.invalidSad();
-        }
-
         if (request.hashes() == null || request.hashes().isEmpty()) {
             return ResponseEntity.badRequest().body(
                     new ErrorResponse("invalid_request", "Missing hashes in request"));
         }
-
+        Es256.requireSignAlgo(request.signAlgo(), true);
+        var credential = callers.authorized(caller, request.SAD(), request.credentialID(),
+                request.hashes().size(), SigningService.decodeAll(request.hashes()));
+        if (credential == null) {
+            return Callers.invalidSad();
+        }
         var signatures = signingService.signHashes(request.hashes(), request.hashAlgorithmOID(), credential);
         audit.credentialSigned(caller.userId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignHashResponse(signatures, null));
@@ -209,22 +240,34 @@ public class CscV2Controller {
         var caller = callers.fromBearer(authHeader);
         if (caller.error() != null) return caller.error();
 
-        var credential = callers.authorized(caller, request.SAD(), request.credentialID());
-        if (credential == null) {
-            return Callers.invalidSad();
-        }
-
         // CSC v2 input modes: documents (the service builds the AdES signature,
         // SigningService) or documentDigests (precomputed hashes, signed as in signHash).
         if (request.documents() != null && !request.documents().isEmpty()) {
-            return signDocuments(request, caller, credential);
+            request.documents().forEach(d -> Es256.requireSignAlgo(d.signAlgo(), false));
+            var credential = callers.authorized(caller, request.SAD(), request.credentialID(),
+                    request.documents().size(), null);
+            return credential == null ? Callers.invalidSad() : signDocuments(request, caller, credential);
         }
         if (request.documentDigests() != null && !request.documentDigests().isEmpty()) {
-            return signDocumentDigests(request, caller, credential);
+            request.documentDigests().forEach(d -> Es256.requireSignAlgo(d.signAlgo(), false));
+            var hashes = digests(request);
+            var credential = callers.authorized(caller, request.SAD(), request.credentialID(),
+                    hashes.size(), SigningService.decodeAll(hashes));
+            return credential == null ? Callers.invalidSad() : signDocumentDigests(request, hashes, caller, credential);
         }
-
         return ResponseEntity.badRequest().body(
                 new ErrorResponse("invalid_request", "Either 'documents' or 'documentDigests' must be provided"));
+    }
+
+    private static List<String> digests(SignDocRequest request) {
+        return request.documentDigests().stream()
+                .flatMap(d -> d.hashes() == null ? Stream.<String>empty() : d.hashes().stream()).toList();
+    }
+
+    private static void requireNumSignatures(int numSignatures) {
+        if (numSignatures < 1 || numSignatures > MULTISIGN) {
+            throw new InvalidRequestException("numSignatures must be between 1 and " + MULTISIGN);
+        }
     }
 
     private ResponseEntity<SignDocResponse> signDocuments(SignDocRequest request, Callers.Caller caller,
@@ -244,13 +287,10 @@ public class CscV2Controller {
                 signatureObjects.isEmpty() ? null : signatureObjects, null, null));
     }
 
-    private ResponseEntity<SignDocResponse> signDocumentDigests(SignDocRequest request, Callers.Caller caller,
+    private ResponseEntity<SignDocResponse> signDocumentDigests(SignDocRequest request, List<String> hashes,
+                                                               Callers.Caller caller,
                                                                CredentialService.Credential credential) {
-        var allHashes = new ArrayList<String>();
-        for (var dd : request.documentDigests()) {
-            if (dd.hashes() != null) allHashes.addAll(dd.hashes());
-        }
-        var signatures = signingService.signHashes(allHashes, request.hashAlgorithmOID(), credential);
+        var signatures = signingService.signHashes(hashes, request.hashAlgorithmOID(), credential);
         audit.credentialSigned(caller.userId(), request.credentialID(), signatures.size(), "v2");
         return ResponseEntity.ok(new SignDocResponse(null, signatures, null, null));
     }

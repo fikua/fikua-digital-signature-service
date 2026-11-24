@@ -1,5 +1,7 @@
 package com.fikua.dss.service;
 
+import com.fikua.dss.web.InvalidRequestException;
+
 import java.security.AlgorithmParameters;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
@@ -23,6 +25,14 @@ public final class Es256 {
     private static final ECParameterSpec P256 = p256();
 
     private Es256() {}
+
+    /** Refuses a signature algorithm other than ES256, or none when it is required. */
+    public static void requireSignAlgo(String signAlgo, boolean required) {
+        var missing = signAlgo == null || signAlgo.isBlank();
+        if (missing ? required : !SIGNATURE_OID.equals(signAlgo.trim())) {
+            throw new InvalidRequestException("Only ES256: signAlgo must be " + SIGNATURE_OID);
+        }
+    }
 
     /** Refuses a certificate whose key is not EC P-256: the credential could not sign ES256. */
     public static void requireP256(X509Certificate certificate) {

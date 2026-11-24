@@ -4,6 +4,7 @@ import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CertificateProperties;
 import com.fikua.dss.config.DssProperties.CredentialProperties;
 import com.fikua.dss.config.DssProperties.UserProperties;
+import com.fikua.dss.web.InvalidRequestException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -76,36 +77,54 @@ class TokenServiceTest {
 
     @Test
     void aSadIsValidOnceForItsUserAndCredential() {
-        var sad = service.issueSad(USER, "mock-credential-001", "mock-password");
-        assertTrue(service.validateSad(USER, sad, "mock-credential-001"));
-        assertFalse(service.validateSad(USER, sad, "mock-credential-001"), "single use");
+        var sad = service.issueSad(USER, "mock-credential-001", "mock-password", 1, List.of());
+        assertTrue(service.spendSad(USER, sad, "mock-credential-001", 1, null));
+        assertFalse(service.spendSad(USER, sad, "mock-credential-001", 1, null), "single use");
     }
 
     @Test
     void eachCredentialOfAUserHasItsOwnPassword() {
-        var sad = service.issueSad(USER, "mock-credential-002", "second-password");
-        assertTrue(service.validateSad(USER, sad, "mock-credential-002"));
+        var sad = service.issueSad(USER, "mock-credential-002", "second-password", 1, List.of());
+        assertTrue(service.spendSad(USER, sad, "mock-credential-002", 1, null));
         assertThrows(SecurityException.class,
-                () -> service.issueSad(USER, "mock-credential-002", "mock-password"));
+                () -> service.issueSad(USER, "mock-credential-002", "mock-password", 1, List.of()));
     }
 
     @Test
     void aUserCannotAuthorizeAnotherUsersCredential() {
         assertThrows(SecurityException.class,
-                () -> service.issueSad(USER, "other-credential", "other-password"));
+                () -> service.issueSad(USER, "other-credential", "other-password", 1, List.of()));
     }
 
     @Test
     void issueSadRejectsAnUnknownCredential() {
-        assertThrows(SecurityException.class, () -> service.issueSad(USER, "nope", "mock-password"));
+        assertThrows(SecurityException.class, () -> service.issueSad(USER, "nope", "mock-password", 1, List.of()));
     }
 
     @Test
     void aSadIsNotValidForAnotherCredentialOrUser() {
-        var sad = service.issueSad(USER, "mock-credential-001", "mock-password");
-        assertFalse(service.validateSad(USER, sad, "mock-credential-002"));
-        assertFalse(service.validateSad(OTHER_USER, sad, "mock-credential-001"));
-        assertFalse(service.validateSad(USER, "no-sad", "mock-credential-001"));
-        assertFalse(service.validateSad(USER, null, "mock-credential-001"));
+        var sad = service.issueSad(USER, "mock-credential-001", "mock-password", 1, List.of());
+        assertFalse(service.spendSad(USER, sad, "mock-credential-002", 1, null));
+        assertFalse(service.spendSad(OTHER_USER, sad, "mock-credential-001", 1, null));
+        assertFalse(service.spendSad(USER, "no-sad", "mock-credential-001", 1, null));
+        assertFalse(service.spendSad(USER, null, "mock-credential-001", 1, null));
+    }
+
+    @Test
+    void aSadOnlySignsTheHashesItAuthorizes() {
+        var hash = new byte[]{1, 2, 3};
+        var sad = service.issueSad(USER, "mock-credential-001", "mock-password", 1, List.of(hash));
+        var other = List.of(new byte[]{9});
+        assertThrows(InvalidRequestException.class,
+                () -> service.spendSad(USER, sad, "mock-credential-001", 1, other));
+        assertTrue(service.spendSad(USER, sad, "mock-credential-001", 1, List.of(hash.clone())), "not spent by a refusal");
+    }
+
+    @Test
+    void aSadSignsAsManyTimesAsItAuthorizes() {
+        var sad = service.issueSad(USER, "mock-credential-001", "mock-password", 1, List.of());
+        assertThrows(InvalidRequestException.class,
+                () -> service.spendSad(USER, sad, "mock-credential-001", 2, null));
+        assertTrue(service.spendSad(USER, sad, "mock-credential-001", 1, null));
     }
 }

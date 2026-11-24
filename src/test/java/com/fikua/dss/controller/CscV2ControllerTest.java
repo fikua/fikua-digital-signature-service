@@ -41,7 +41,7 @@ class CscV2ControllerTest extends IntegrationTestBase {
     }
 
     private String issueSad() {
-        return tokenService.issueSad("mock-client", "mock-credential-001", "mock-password");
+        return tokenService.issueSad("mock-client", "mock-credential-001", "mock-password", 1, List.of());
     }
 
     private static String sha256Base64Url(byte[] data) throws Exception {
@@ -58,7 +58,7 @@ class CscV2ControllerTest extends IntegrationTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.specs").value("2.0.0.0"))
+                .andExpect(jsonPath("$.specs").value("2.1.0.1"))
                 .andExpect(jsonPath("$.signature_formats").exists())
                 .andExpect(jsonPath("$.conformance_levels").isArray())
                 .andExpect(jsonPath("$.methods", org.hamcrest.Matchers.hasItem("signatures/signDoc")));
@@ -169,7 +169,7 @@ class CscV2ControllerTest extends IntegrationTestBase {
         var hash = sha256Base64Url("hello".getBytes());
         var sad = issueSad();
         var req = new SignHashRequest("mock-credential-001", sad, List.of(hash),
-                "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
+                "2.16.840.1.101.3.4.2.1", "1.2.840.10045.4.3.2", null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,7 +182,7 @@ class CscV2ControllerTest extends IntegrationTestBase {
     @Test
     void signHashRejectsExpiredOrInvalidSad() throws Exception {
         var req = new SignHashRequest("mock-credential-001", "not-a-sad",
-                List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1", null, null, null, null, null, null);
+                List.of("aGVsbG8"), "2.16.840.1.101.3.4.2.1", "1.2.840.10045.4.3.2", null, null, null, null, null);
         mockMvc.perform(post("/csc/v2/signatures/signHash")
                         .header("Authorization", bearer())
                         .contentType(MediaType.APPLICATION_JSON)

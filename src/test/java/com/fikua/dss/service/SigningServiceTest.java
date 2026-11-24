@@ -138,7 +138,7 @@ class SigningServiceTest {
         var hash = b64url(MessageDigest.getInstance(jcaDigest).digest(DATA));
         var signatures = service.signHashes(List.of(hash), oid, credential);
         assertEquals(1, signatures.size());
-        return Base64.getUrlDecoder().decode(signatures.getFirst());
+        return Base64.getDecoder().decode(signatures.getFirst());
     }
 
     private static boolean verify(String algorithm, Credential credential, byte[] signature) throws Exception {

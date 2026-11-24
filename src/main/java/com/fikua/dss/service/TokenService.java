@@ -1,11 +1,13 @@
 package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
+import com.fikua.dss.web.InvalidRequestException;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,7 +50,12 @@ public class TokenService {
         return entry.userId();
     }
 
-    public String issueSad(String userId, String credentialId, String password) {
+    /**
+     * @param numSignatures how many signatures it authorizes
+     * @param hashes        the only hashes it authorizes; empty when the client did not say (SCAL 1)
+     */
+    public String issueSad(String userId, String credentialId, String password, int numSignatures,
+                           List<byte[]> hashes) {
         var credential = credentials.credential(userId, credentialId);
         if (credential == null) {
             throw new SecurityException("Unknown credential ID");
@@ -57,23 +64,42 @@ public class TokenService {
             throw new SecurityException("Invalid credential password");
         }
         var sad = UUID.randomUUID().toString();
-        activeSads.put(sad, new SadEntry(userId, credentialId, Instant.now().plusSeconds(properties.sadTtlSeconds())));
+        activeSads.put(sad, new SadEntry(userId, credentialId, Instant.now().plusSeconds(properties.sadTtlSeconds()),
+                numSignatures, List.copyOf(hashes)));
         return sad;
     }
 
-    /** True once for a SAD this user obtained for this credential and that has not expired. */
-    public boolean validateSad(String userId, String sad, String credentialId) {
-        var entry = sad == null ? null : activeSads.get(sad);
+    /**
+     * Spends a valid SAD, once, for this many signatures.
+     *
+     * @param hashes the hashes to sign; null when the service computes them (documents)
+     * @throws InvalidRequestException when it does not authorize them; it is not spent
+     */
+    public boolean spendSad(String userId, String sad, String credentialId, int signatures, List<byte[]> hashes) {
+        var entry = sad(userId, sad, credentialId);
         if (entry == null) return false;
+        if (signatures > entry.numSignatures()) {
+            throw new InvalidRequestException("The SAD authorizes fewer signatures");
+        }
+        if (hashes != null && !entry.hashes().isEmpty()
+                && !hashes.stream().allMatch(h -> entry.hashes().stream().anyMatch(a -> MessageDigest.isEqual(a, h)))) {
+            throw new InvalidRequestException("The SAD does not authorize this hash");
+        }
+        return activeSads.remove(sad, entry);
+    }
+
+    private SadEntry sad(String userId, String sad, String credentialId) {
+        var entry = sad == null ? null : activeSads.get(sad);
+        if (entry == null) return null;
         if (Instant.now().isAfter(entry.expiry())) {
             activeSads.remove(sad);
-            return false;
+            return null;
         }
-        if (!entry.userId().equals(userId) || !entry.credentialId().equals(credentialId)) {
-            return false;
-        }
-        activeSads.remove(sad);
-        return true;
+        return entry.userId().equals(userId) && entry.credentialId().equals(credentialId) ? entry : null;
+    }
+
+    public int sadTtlSeconds() {
+        return properties.sadTtlSeconds();
     }
 
     public void revokeToken(String token) {
@@ -88,5 +114,6 @@ public class TokenService {
 
     private record TokenEntry(String userId, Instant expiry) {}
 
-    private record SadEntry(String userId, String credentialId, Instant expiry) {}
+    private record SadEntry(String userId, String credentialId, Instant expiry, int numSignatures,
+                            List<byte[]> hashes) {}
 }
