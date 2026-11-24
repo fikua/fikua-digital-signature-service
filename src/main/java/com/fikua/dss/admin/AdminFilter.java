@@ -21,6 +21,7 @@ import java.util.List;
 public class AdminFilter extends OncePerRequestFilter {
 
     static final String ADMINISTRATOR = "fikua.administrator";
+    @SuppressWarnings("java:S1075") // The path of the API itself, not of another system.
     private static final String PATH = "/admin/";
     private static final String BEARER = "Bearer ";
 

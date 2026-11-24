@@ -160,10 +160,10 @@ class KeycloakClientsTest {
     @Test
     void withoutAnswerOrPermissionItSaysSo() {
         var wrong = new KeycloakClients(new AdminProperties.Keycloak(url, "dss", "fikua-sign-admin", "nope"));
-        var error = assertThrows(MachineClients.Unavailable.class, () -> wrong.create("x-dev", ""));
+        var error = assertThrows(ClientsUnavailableException.class, () -> wrong.create("x-dev", ""));
         assertTrue(error.getMessage().contains("401"), error.getMessage());
         var nowhere = new KeycloakClients(
                 new AdminProperties.Keycloak("http://localhost:1", "dss", "fikua-sign-admin", "x"));
-        assertThrows(MachineClients.Unavailable.class, () -> nowhere.create("x-dev", ""));
+        assertThrows(ClientsUnavailableException.class, () -> nowhere.create("x-dev", ""));
     }
 }

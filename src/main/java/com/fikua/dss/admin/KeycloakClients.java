@@ -72,7 +72,7 @@ public class KeycloakClients implements MachineClients {
                 keepOnly(id, "optional-client-scopes", OPTIONAL_SCOPES);
                 return secret(id);
             } catch (RuntimeException e) {
-                http.delete().uri(clients() + "/{id}", id).headers(h -> h.setBearerAuth(token()))
+                http.delete().uri(client(""), id).headers(h -> h.setBearerAuth(token()))
                         .retrieve().toBodilessEntity();
                 throw e;
             }
@@ -83,21 +83,21 @@ public class KeycloakClients implements MachineClients {
     public String rotateSecret(String clientId) {
         return answering(() -> {
             var id = managed(clientId);
-            return http.post().uri(clients() + "/{id}/client-secret", id).headers(h -> h.setBearerAuth(token()))
+            return http.post().uri(client("/client-secret"), id).headers(h -> h.setBearerAuth(token()))
                     .retrieve().body(Secret.class).value();
         });
     }
 
     @Override
     public void setEnabled(String clientId, boolean enabled) {
-        answering(() -> http.put().uri(clients() + "/{id}", managed(clientId))
+        answering(() -> http.put().uri(client(""), managed(clientId))
                 .headers(h -> h.setBearerAuth(token())).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("clientId", clientId, "enabled", enabled)).retrieve().toBodilessEntity());
     }
 
     @Override
     public void delete(String clientId) {
-        answering(() -> http.delete().uri(clients() + "/{id}", managed(clientId))
+        answering(() -> http.delete().uri(client(""), managed(clientId))
                 .headers(h -> h.setBearerAuth(token())).retrieve().toBodilessEntity());
     }
 
@@ -120,23 +120,28 @@ public class KeycloakClients implements MachineClients {
     }
 
     private void keepOnly(String id, String kind, Set<String> wanted) {
-        var scopes = http.get().uri(clients() + "/{id}/" + kind, id).headers(h -> h.setBearerAuth(token()))
+        var scopes = http.get().uri(client("/" + kind), id).headers(h -> h.setBearerAuth(token()))
                 .retrieve().body(Scope[].class);
         for (var scope : scopes) {
             if (!wanted.contains(scope.name())) {
-                http.delete().uri(clients() + "/{id}/" + kind + "/{scope}", id, scope.id())
+                http.delete().uri(client("/" + kind + "/{scope}"), id, scope.id())
                         .headers(h -> h.setBearerAuth(token())).retrieve().toBodilessEntity();
             }
         }
     }
 
     private String secret(String id) {
-        return http.get().uri(clients() + "/{id}/client-secret", id).headers(h -> h.setBearerAuth(token()))
+        return http.get().uri(client("/client-secret"), id).headers(h -> h.setBearerAuth(token()))
                 .retrieve().body(Secret.class).value();
     }
 
     private String clients() {
         return "/admin/realms/" + properties.realm() + "/clients";
+    }
+
+    /** The path of one client, by its internal id. */
+    private String client(String rest) {
+        return clients() + "/{id}" + rest;
     }
 
     private synchronized String token() {
@@ -161,9 +166,9 @@ public class KeycloakClients implements MachineClients {
                 throw new InvalidRequestException("There is a client with that id");
             }
             // Its body could say too much; the status is enough.
-            throw new Unavailable("Keycloak answered " + e.getStatusCode().value(), null);
+            throw new ClientsUnavailableException("Keycloak answered " + e.getStatusCode().value(), null);
         } catch (RestClientException e) {
-            throw new Unavailable("Keycloak does not answer", e);
+            throw new ClientsUnavailableException("Keycloak does not answer", e);
         }
     }
 

@@ -128,8 +128,8 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("not_found", e.getMessage()));
     }
 
-    @ExceptionHandler(MachineClients.Unavailable.class)
-    public ResponseEntity<ErrorResponse> unavailable(MachineClients.Unavailable e) {
+    @ExceptionHandler(ClientsUnavailableException.class)
+    public ResponseEntity<ErrorResponse> unavailable(ClientsUnavailableException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(new ErrorResponse("authorization_server_unavailable", e.getMessage()));
     }

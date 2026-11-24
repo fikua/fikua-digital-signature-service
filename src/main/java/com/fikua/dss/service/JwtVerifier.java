@@ -63,7 +63,7 @@ public final class JwtVerifier {
         } catch (KeySourceException e) {
             log.atWarn().setMessage("authorization server keys unavailable").setCause(e).log();
             throw new AccessTokens.Unavailable(e);
-        } catch (ParseException | BadJOSEException | JOSEException e) {
+        } catch (ParseException | BadJOSEException | JOSEException _) {
             return Optional.empty();
         }
     }

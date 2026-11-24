@@ -42,6 +42,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -88,7 +89,7 @@ class AdminApiTest extends IntegrationTestBase {
         boolean down;
 
         private void answer() {
-            if (down) throw new Unavailable("down", null);
+            if (down) throw new ClientsUnavailableException("down", null);
         }
 
         @Override
@@ -291,7 +292,7 @@ class AdminApiTest extends IntegrationTestBase {
         var old = create("rot-dev").get("clientSecret").asString();
         var secret = json(call(HttpMethod.POST, "/admin/v1/users/rot-dev/secret", null).andExpect(status().isOk()))
                 .get("clientSecret").asString();
-        assertFalse(old.equals(secret));
+        assertNotEquals(old, secret);
         call(HttpMethod.POST, "/admin/v1/users/nobody/secret", null).andExpect(status().isNotFound());
     }
 

@@ -12,11 +12,4 @@ public interface MachineClients {
     void setEnabled(String clientId, boolean enabled);
 
     void delete(String clientId);
-
-    /** The authorization server does not answer, or refuses. */
-    class Unavailable extends RuntimeException {
-        public Unavailable(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
 }
