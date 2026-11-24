@@ -1,10 +1,11 @@
 Fikua Digital Signature Service
-Copyright 2026 Fikua
+Copyright 2026 Oriol Canadés Díez
 
-This product includes software developed by Fikua
-(https://fikua.com).
-
-This product includes software developed by third parties:
+This product includes software developed by third parties, among others:
+  - DSS, Digital Signature Service, of the European Commission (https://github.com/esig/dss) — LGPL-2.1
   - Spring Boot (https://spring.io/projects/spring-boot) — Apache-2.0
-  - BouncyCastle (https://www.bouncycastle.org/) — MIT-style (BC license)
+  - OpenTelemetry Java instrumentation (https://github.com/open-telemetry/opentelemetry-java-instrumentation) — Apache-2.0
+  - springdoc-openapi (https://springdoc.org) — Apache-2.0
+  - logstash-logback-encoder (https://github.com/logfellow/logstash-logback-encoder) — Apache-2.0 and MIT
+  - Bouncy Castle (https://www.bouncycastle.org/) — Bouncy Castle Licence (MIT style)
   - Nimbus JOSE+JWT (https://connect2id.com/products/nimbus-jose-jwt) — Apache-2.0
