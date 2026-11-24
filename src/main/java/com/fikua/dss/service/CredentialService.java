@@ -2,6 +2,7 @@ package com.fikua.dss.service;
 
 import com.fikua.dss.config.DssProperties;
 import com.fikua.dss.config.DssProperties.CredentialProperties;
+import com.fikua.dss.users.ManagedUsers;
 import jakarta.annotation.PostConstruct;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
@@ -10,6 +11,8 @@ import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
@@ -32,8 +35,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The users of the service and their credentials (CSC v2), loaded at start
- * from {@code dss.users}. A user is the OAuth2 client that authenticates; it
+ * The users of the service and their credentials (CSC v2): those loaded at start
+ * from {@code dss.users} and, when there is a database, those in it. A user is the OAuth2 client that authenticates; it
  * only ever sees and uses its own credentials.
  */
 @Service
@@ -42,12 +45,24 @@ public class CredentialService {
     private static final Logger log = LoggerFactory.getLogger(CredentialService.class);
 
     private final DssProperties properties;
+    private final ManagedUsers managed;
     private final ResourceLoader resourceLoader = new DefaultResourceLoader();
     private final Map<String, User> users = new LinkedHashMap<>();
     private final Map<String, Credential> credentials = new LinkedHashMap<>();
 
+    @Autowired
+    public CredentialService(DssProperties properties, ObjectProvider<ManagedUsers> managed) {
+        this(properties, managed.getIfAvailable());
+    }
+
+    /** Only the users of the configuration. */
     public CredentialService(DssProperties properties) {
+        this(properties, (ManagedUsers) null);
+    }
+
+    private CredentialService(DssProperties properties, ManagedUsers managed) {
         this.properties = properties;
+        this.managed = managed;
     }
 
     @PostConstruct
@@ -76,9 +91,16 @@ public class CredentialService {
         }
     }
 
-    /** The user with this client id, or null. */
+    /** The user with this client id, or null when there is none or it is not active. */
     public User user(String userId) {
-        return userId == null ? null : users.get(userId);
+        if (userId == null) return null;
+        var configured = users.get(userId);
+        if (managed == null) return configured;
+        var row = managed.user(userId);
+        // The database decides whether a user is active, also one of the configuration.
+        if (row.isPresent() && !row.get().active()) return null;
+        if (configured != null) return configured;
+        return row.map(u -> new User(u.clientId(), null, List.of())).orElse(null);
     }
 
     /** The credential with this id when it belongs to this user; null otherwise. */

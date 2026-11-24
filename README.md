@@ -93,6 +93,8 @@ All settings via environment variables. The container does **not** ship with any
 | `DSS_OAUTH_ISSUER` | | Issuer of the authorization server whose access tokens (JWT, ES256) are accepted besides the service's own; empty, none |
 | `DSS_OAUTH_JWKS_URI` | | Its JWK set (required with an issuer) |
 | `DSS_OAUTH_AUDIENCE` | | The audience those tokens must carry (required with an issuer) |
+| `DSS_DATABASE_URL` | | JDBC URL of the PostgreSQL database of users and credentials; unset, only the users of the configuration |
+| `DSS_DATABASE_USERNAME`, `DSS_DATABASE_PASSWORD` | | Its role, owner of the schema |
 
 A token of the authorization server acts as the user whose `client-id` is its `azp`.
 

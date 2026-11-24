@@ -130,10 +130,19 @@ dependencies {
     implementation 'org.bouncycastle:bcprov-jdk18on:1.87'
     implementation 'org.bouncycastle:bcpkix-jdk18on:1.87'
     implementation 'com.nimbusds:nimbus-jose-jwt:10.10'
+    // Users and credentials in PostgreSQL. Without Spring Boot's starters on
+    // purpose: the database is optional (DatabaseConfig).
+    implementation 'org.springframework:spring-jdbc'
+    implementation 'org.springframework.security:spring-security-crypto'
+    implementation 'com.zaxxer:HikariCP'
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'io.opentelemetry:opentelemetry-sdk-testing'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
 }
 
 springBoot {

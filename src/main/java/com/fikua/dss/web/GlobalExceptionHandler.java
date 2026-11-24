@@ -4,6 +4,7 @@ import com.fikua.dss.dto.common.ErrorResponse;
 import com.fikua.dss.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -74,6 +75,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("not_found", "No handler for requested resource"));
+    }
+
+    /** The database of users cannot be read: nobody can be told apart now. */
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ErrorResponse> handleDatabase(DataAccessException e) {
+        log.atError().setMessage("database unavailable").setCause(e).log();
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("temporarily_unavailable", "The service cannot answer now"));
     }
 
     @ExceptionHandler(InvalidRequestException.class)

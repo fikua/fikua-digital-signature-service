@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- **Users and credentials in PostgreSQL**, optional (`DSS_DATABASE_URL`, `DSS_DATABASE_USERNAME`,
+  `DSS_DATABASE_PASSWORD`; migrated with Flyway at start). The users of the configuration
+  still work. A user deactivated in the database is refused at once, also one of the
+  configuration and with a token it already has. A credential's password is kept as an
+  Argon2id hash and can be rotated with an overlap. Credentials of the database cannot
+  sign yet (#9). When the database cannot be read, the answer is 503.
+
 ## [0.11.0] - 2026-11-24
 
 ### Changed
