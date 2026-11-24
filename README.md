@@ -1,6 +1,9 @@
 # Fikua Digital Signature Service
 
-Spring Boot service implementing the [Cloud Signature Consortium (CSC) API](https://cloudsignatureconsortium.org/resources/), exposing both **CSC v1 (1.0.3.0)** and **CSC v2 (2.1.0.1)** as strict, version-conformant surfaces in parallel (`/csc/v1/...` and `/csc/v2/...`). Initial mode is a **mock Trust Service Provider (TSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. The roadmap is to extend it with real DSS (Digital Signature Service — European Commission) support.
+Spring Boot service implementing the [Cloud Signature Consortium (CSC) API](https://cloudsignatureconsortium.org/resources/), exposing both **CSC v1 (1.0.3.0)** and **CSC v2 (2.1.0.1)** as strict, version-conformant surfaces in parallel (`/csc/v1/...` and `/csc/v2/...`). Initial mode is a **mock Trust Service Provider (TSP)** for local development and CI testing of remote signing flows used by Issuer/EBW components in the EUDI Wallet stack. It signs with the European Commission's DSS libraries.
+
+> [!NOTE]
+> **Two things are called DSS.** In this repository, *Fikua DSS* is this service, and *EU DSS* is the European Commission's library and demonstrations ([esig/dss](https://github.com/esig/dss)). The Fikua DSS uses the EU DSS libraries; a relying system may also run the EU DSS demonstrations on its own to validate trust. They are different deployments.
 
 > [!WARNING]
 > **Mock mode is for development and testing only.** It accepts static client secrets and signs with test certificates. **Never deploy this as a real (qualified) TSP** and never feed it a production e-seal certificate.
@@ -10,6 +13,11 @@ Spring Boot service implementing the [Cloud Signature Consortium (CSC) API](http
 The model is CSC v2's: a **user** is an OAuth2 client (`client_credentials`) and owns one or more **credentials**, each a certificate with its private key, unlocked with its own password. A user's access token only ever lists, inspects, authorizes or signs with **its own** credentials: every call resolves the user from the token, and a credential is used only when it belongs to that user and a SAD for it was issued to that user. See `UserIsolationTest`.
 
 One user per calling system (the Lab issuer, verifier and Wallet Provider are three users), so a leaked token cannot sign with another system's key.
+
+## Keys and certificates
+
+- **Today**, each credential's certificate and key are files mounted at `/certs/`.
+- **Decided, not built yet** ([#9](https://github.com/fikua/fikua-digital-signature-service/issues/9)): the Fikua DSS creates the key of each credential, gives a CSR, and activates the credential when it receives the certificate a CA issued for that key. Private keys are never imported or returned. A credential waiting for its certificate does not sign, and revoking one destroys its key.
 
 ## Endpoints
 
@@ -105,7 +113,7 @@ Every credential's certificate and key must be mounted read-only into the contai
 
 ## Quick start
 
-### Generate a mock certificate
+### Generate a mock certificate (local development only)
 
 ```bash
 mkdir -p certs

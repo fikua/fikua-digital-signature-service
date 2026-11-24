@@ -12,6 +12,11 @@ DSS (Digital Signature Service — European Commission).
 **Mock mode is dev/test only — never deploy to production as a real
 (qualified) TSP.**
 
+**Names.** "Fikua DSS" is this service. "EU DSS" is the European Commission's
+library and demonstrations (`esig/dss`), which this service uses and which other
+systems also run on their own. Write one or the other, never "the DSS" alone,
+where both can be meant.
+
 ## Users and credentials
 
 `dss.users` is a list of users (CSC v2): each is an OAuth2 client
@@ -61,9 +66,9 @@ config.
 - **Repo:** `github.com/fikua/fikua-digital-signature-service` (public, Apache-2.0).
 - **CI:** `.github/workflows/ci.yml` (shared workflows) publishes `latest`
   and `sha-<short>` on push to `main`, and `X.Y.Z` on `v*.*.*` tags.
-- **VPS:** never deployed from here. `fikua-platform-iac/projects/fikua-lab/dss/compose.yaml`
-  pins the release; Dependabot there proposes new ones (fikua-docs ADR 0019). Public endpoint `mock-qtsp.altia.fikua.com` (name
-  kept for compatibility with existing STG seeds/configs).
+- **VPS:** never deployed from here. `fikua-platform-iac/projects/fikua-digital-signature-service/compose.yaml`
+  pins the release; Dependabot there proposes new ones (fikua-docs ADR 0019).
+  Public endpoint: `dss.fikua.com`.
 
 ## Certificates — never bake into the image
 
@@ -76,12 +81,17 @@ config.
 - A previous version (≤ 0.2.0) embedded an Altia e-seal key in the JAR —
   that key has been considered compromised and the Docker Hub repo was
   wiped and re-created under a new name. Do not regress.
-- All credential leaves (Altia, Fikua, ...) are issued under one shared test CA
-  representing the `fikua-dss` mock TSP (`Fikua DSS Mock TSP Root CA
-  (test)`, `O=Fikua`, `organizationIdentifier=VATES-B00000001`) — mirroring
-  how a real TSP issues one leaf per subscriber under its own CA, rather
-  than each client bringing its own root. Never issue a new credential leaf
-  under a different/self-signed CA.
+- **Today:** all credential leaves are issued under one test CA (`Fikua DSS
+  Mock TSP Root CA (test)`) and their keys are mounted as files. Issue no new
+  leaf under it.
+- **Target (fikua-docs ADR 0022, proposed; #9):** the Fikua DSS creates the keys
+  of its credentials, gives a CSR and activates the credential with the
+  certificate of an issuing CA that is outside the service. It never imports or
+  returns a private key: no PKCS#12 upload, no `loadPrivateKey`. The current
+  credentials are replaced, not migrated.
+- Outside local development, never sign with a self-signed certificate. The only exception is the list
+  signer (ETSI TS 119 612, clause 5.7.1), created by an operator command, not by
+  the API.
 
 ## Git workflow
 
