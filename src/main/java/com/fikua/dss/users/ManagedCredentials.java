@@ -43,6 +43,14 @@ public class ManagedCredentials {
         });
     }
 
+    /** A new user with its first credential, or none of them. */
+    public void createWithUser(ManagedUser user, String id, String password) {
+        transaction.executeWithoutResult(_ -> {
+            users.create(user);
+            create(id, user.clientId(), password);
+        });
+    }
+
     public String csr(String id, String subject) {
         require(id);
         return certificates.csr(id, subject);

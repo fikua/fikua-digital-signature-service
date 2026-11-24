@@ -192,6 +192,29 @@ docker compose run --rm -e DSS_COMMAND=create-list-signer \
   -e DSS_LIST_SIGNER_COMMON_NAME="<name>" dss
 ```
 
+## Administration API
+
+On its own port, with nothing else there and nowhere else, only when `DSS_ADMIN_PORT` is set. It needs the database, the key store and:
+
+| Variable | Description |
+| --- | --- |
+| `DSS_ADMIN_PORT` | Its port; never routed to the public |
+| `DSS_ADMIN_ISSUER`, `DSS_ADMIN_JWKS_URI`, `DSS_ADMIN_AUDIENCE` | Whose tokens it accepts, and for which audience |
+| `DSS_ADMIN_GROUP` | The group of the token's `groups` that gets in (`dss-admins`) |
+| `DSS_ADMIN_KEYCLOAK_URL`, `DSS_ADMIN_KEYCLOAK_CLIENT_SECRET` | The Keycloak whose clients it manages, with the service account `fikua-sign-admin` (`manage-clients`) of realm `dss` |
+
+| | `/admin/v1` |
+| --- | --- |
+| `GET /me`, `/users`, `/users/{id}`, `/credentials` | Read |
+| `POST /users` | A user: its client, its first credential and its key. Answers the four values, once |
+| `PUT /users/{id}` | Takes a user of the configuration under administration |
+| `PATCH /users/{id}` | `{"active": false}`: refused at once, also with the tokens it has |
+| `POST /users/{id}/secret` | A new client secret; the old one stops at once |
+| `POST /users/{id}/credentials` | Another credential, with a new key |
+| `GET /credentials/{id}/csr`, `PUT /credentials/{id}/certificate` | The CSR and the certificate; the same key again is a renewal |
+| `POST /credentials/{id}/password` | A new password; `{"overlapHours": 24}` keeps the old one that long |
+| `DELETE /credentials/{id}` | Revokes it and destroys its key |
+
 ## Signing flow
 
 ```text

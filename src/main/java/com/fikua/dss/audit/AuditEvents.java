@@ -31,6 +31,10 @@ import org.springframework.stereotype.Component;
  *       <td>user.id, credential.id, signature.count, csc.version</td></tr>
  *   <tr><td>auth.rejected</td><td>a client, token, SAD or authorization data was refused</td>
  *       <td>user.id (only when it is a known user), reason</td></tr>
+ *   <tr><td>admin.user.created, .adopted, .activated, .deactivated, .secret_rotated</td>
+ *       <td>an administrator did it to a user</td><td>admin.id, user.id</td></tr>
+ *   <tr><td>admin.credential.created, .csr_downloaded, .certificate_installed, .password_rotated, .revoked</td>
+ *       <td>an administrator did it to a credential</td><td>admin.id, user.id, credential.id</td></tr>
  * </table>
  *
  * <p>{@code user.id} is the OAuth2 client id of the user (CSC v2). Until 0.8.0 the
@@ -52,6 +56,7 @@ public class AuditEvents {
     static final AttributeKey<String> EVENT_DOMAIN = AttributeKey.stringKey("event.domain");
     static final AttributeKey<String> EVENT_NAME = AttributeKey.stringKey("event.name");
     static final AttributeKey<String> USER = AttributeKey.stringKey("user.id");
+    static final AttributeKey<String> ADMINISTRATOR = AttributeKey.stringKey("admin.id");
     static final AttributeKey<String> CREDENTIAL = AttributeKey.stringKey("credential.id");
     static final AttributeKey<Long> SIGNATURE_COUNT = AttributeKey.longKey("signature.count");
     static final AttributeKey<String> CSC_VERSION = AttributeKey.stringKey("csc.version");
@@ -116,6 +121,21 @@ public class AuditEvents {
                 .put(SIGNATURE_COUNT, signatureCount)
                 .put(CSC_VERSION, cscVersion));
         count("credential.sign", SUCCESS, userId, null);
+    }
+
+    /**
+     * An operation of the administration API, done.
+     *
+     * @param administratorId the subject of the administrator's token, a pseudonym
+     * @param credentialId    null when it is of the user
+     */
+    public void administered(String name, String administratorId, String userId, String credentialId) {
+        var attributes = Attributes.builder().put(ADMINISTRATOR, administratorId).put(USER, userId);
+        if (credentialId != null) {
+            attributes.put(CREDENTIAL, credentialId);
+        }
+        emit(name, attributes);
+        count(name, SUCCESS, userId, null);
     }
 
     /**
