@@ -41,6 +41,12 @@ dss:
             key-path: file:/certs/mock-eseal.key
   token-ttl-seconds: ${TOKEN_TTL:3600}
   sad-ttl-seconds: ${SAD_TTL:300}
+  # Access tokens of an authorization server (Keycloak), accepted besides this
+  # service's own. Off without an issuer; with one, the other two are required.
+  oauth:
+    issuer: ${DSS_OAUTH_ISSUER:}
+    jwks-uri: ${DSS_OAUTH_JWKS_URI:}
+    audience: ${DSS_OAUTH_AUDIENCE:}
 
 # Actuator on an internal management port (Traefik routes only the server
 # port): its health details name users and certificates. The public

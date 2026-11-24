@@ -82,6 +82,11 @@ All settings via environment variables. The container does **not** ship with any
 | `SERVER_PORT` | `9090`  | HTTP port |
 | `TOKEN_TTL`   | `3600`  | Access token lifetime (seconds) |
 | `SAD_TTL`     | `300`   | SAD lifetime (seconds) |
+| `DSS_OAUTH_ISSUER` | | Issuer of the authorization server whose access tokens (JWT, ES256) are accepted besides the service's own; empty, none |
+| `DSS_OAUTH_JWKS_URI` | | Its JWK set (required with an issuer) |
+| `DSS_OAUTH_AUDIENCE` | | The audience those tokens must carry (required with an issuer) |
+
+A token of the authorization server acts as the user whose `client-id` is its `azp`.
 
 Users and credentials come from indexed variables, which replace the whole `dss.users` list (the default is one local development user, `mock-client` with `mock-credential-001`):
 
@@ -209,7 +214,7 @@ Spec is at [`/v3/api-docs`](http://localhost:9090/v3/api-docs); the interactive 
 - Spring Boot 4.2 + Spring Boot Actuator
 - EU DSS 6.5.1 (signatures: token, JAdES, CAdES)
 - BouncyCastle 1.87 (key loading, through DSS)
-- Nimbus JOSE+JWT 10.10 (token signing)
+- Nimbus JOSE+JWT 10.10 (access token validation)
 - springdoc-openapi 3.2 (OpenAPI + Swagger UI)
 - OpenTelemetry Java instrumentation 2.34 (Spring Boot starter)
 - Logback + logstash-logback-encoder 9.0 (JSON logs)

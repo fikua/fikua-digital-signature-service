@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-11-24
+
+### Added
+- **Access tokens of an authorization server** (Keycloak): a JWT signed with
+  ES256, checked with its JWK set (cached, with the last keys used up to four hours
+  while the server does not answer), its issuer, audience and expiry. The user is
+  the client it was issued to (`azp`). Configured with `DSS_OAUTH_ISSUER`,
+  `DSS_OAUTH_JWKS_URI` and `DSS_OAUTH_AUDIENCE`; off by default. The service's own
+  tokens are still accepted. When the keys cannot be obtained, the answer is 503.
+
 ## [0.9.0] - 2026-11-22
 
 ### Changed

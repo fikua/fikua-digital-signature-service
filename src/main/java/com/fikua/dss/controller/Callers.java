@@ -3,6 +3,7 @@ package com.fikua.dss.controller;
 import com.fikua.dss.audit.AuditEvents;
 import com.fikua.dss.audit.AuditEvents.Reason;
 import com.fikua.dss.dto.common.ErrorResponse;
+import com.fikua.dss.service.AccessTokens;
 import com.fikua.dss.service.CredentialService;
 import com.fikua.dss.service.CredentialService.Credential;
 import com.fikua.dss.service.CredentialService.User;
@@ -18,28 +19,42 @@ import org.springframework.stereotype.Component;
 class Callers {
 
     private final TokenService tokenService;
+    private final AccessTokens accessTokens;
     private final CredentialService credentials;
     private final AuditEvents audit;
 
-    Callers(TokenService tokenService, CredentialService credentials, AuditEvents audit) {
+    Callers(TokenService tokenService, AccessTokens accessTokens, CredentialService credentials, AuditEvents audit) {
         this.tokenService = tokenService;
+        this.accessTokens = accessTokens;
         this.credentials = credentials;
         this.audit = audit;
     }
 
-    /** The user of the bearer token, or the 401 to answer. */
+    /** The user of the bearer token, or the 401 (503 when its issuer does not answer) to answer. */
     Caller fromBearer(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return Caller.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Missing Bearer token")));
         }
-        var user = credentials.user(tokenService.resolveUserId(authHeader.substring(7)));
+        User user;
+        try {
+            user = credentials.user(userId(authHeader.substring(7)));
+        } catch (AccessTokens.Unavailable e) {
+            return Caller.error(ResponseEntity.status(503).body(
+                    new ErrorResponse("temporarily_unavailable", "The access token cannot be checked now")));
+        }
         if (user == null) {
             audit.refused(null, Reason.INVALID_TOKEN);
             return Caller.error(ResponseEntity.status(401).body(
                     new ErrorResponse("unauthorized", "Invalid or expired access token")));
         }
         return Caller.of(user);
+    }
+
+    /** The user of a token of this service or, if it is not one, of the authorization server. */
+    private String userId(String token) {
+        var own = tokenService.resolveUserId(token);
+        return own != null ? own : accessTokens.clientId(token);
     }
 
     /** One of the caller's credentials, or null when it is not theirs. */
