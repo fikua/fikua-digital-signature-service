@@ -96,7 +96,7 @@ public class ManagedUsers {
         return active;
     }
 
-    private static String pem(List<X509Certificate> chain) {
+    static String pem(List<X509Certificate> chain) {
         var pem = new StringBuilder();
         for (var certificate : chain) {
             try {

@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   CA (`DSS_KEYS_ACCEPTED_CAS_<n>`, PEM files). A private key never comes in or out; it is
   kept encrypted (AES-256-GCM, a data key per credential) and destroyed when the
   credential is revoked. There is no API for it yet (#10).
+- Operator command `create-list-signer`: a credential with the self-signed certificate of
+  a trusted list signer (ADR 0022). The service itself cannot create one.
 
 ### Changed
 - Every signature is made by the credential's signer, without the in-memory PKCS#12.

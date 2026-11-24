@@ -7,6 +7,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class DssApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(DssApplication.class, args);
+        var context = SpringApplication.run(DssApplication.class, args);
+        // An operator command has already run: end instead of serving.
+        if (context.getEnvironment().containsProperty("dss.command")) {
+            System.exit(SpringApplication.exit(context));
+        }
     }
 }

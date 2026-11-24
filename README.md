@@ -180,6 +180,18 @@ The service creates the keys of the credentials in its database and they never l
 
 To change the master key without stopping: set the new one as `DSS_KEYS_MASTER_KEY` and the old one as `DSS_KEYS_PREVIOUS_MASTER_KEY`, and restart. At start the data keys are encrypted again with the new one (the log says how many); the credentials' keys do not change. Then remove the old one and restart. Backups made before still need the old one.
 
+### List signers
+
+The only credentials with a self-signed certificate (ETSI TS 119 612, 5.7.1; fikua-docs ADR 0022) are created by the operator on the server, never by the API. The user must exist. The command prints the public certificate and, only then, the credential's password:
+
+```bash
+docker compose run --rm -e DSS_COMMAND=create-list-signer \
+  -e DSS_TRUSTED_LISTS_ENABLED=false -e SPRING_MAIN_WEB_APPLICATION_TYPE=none \
+  -e DSS_LIST_SIGNER_USER=<client id> -e DSS_LIST_SIGNER_CREDENTIAL=<credential id> \
+  -e DSS_LIST_SIGNER_COUNTRY=ES -e DSS_LIST_SIGNER_ORGANISATION="<scheme operator>" \
+  -e DSS_LIST_SIGNER_COMMON_NAME="<name>" dss
+```
+
 ## Signing flow
 
 ```text
