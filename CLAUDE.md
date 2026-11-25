@@ -83,14 +83,15 @@ config.
 - A previous version (≤ 0.2.0) embedded an Altia e-seal key in the JAR —
   that key has been considered compromised and the Docker Hub repo was
   wiped and re-created under a new name. Do not regress.
-- **Today:** all credential leaves are issued under one test CA (`Fikua DSS
-  Mock TSP Root CA (test)`) and their keys are mounted as files. Issue no new
-  leaf under it.
-- **Target (fikua-docs ADR 0022, proposed; #9):** Fikua Sign creates the keys
-  of its credentials, gives a CSR and activates the credential with the
-  certificate of an issuing CA that is outside the service. It never imports or
-  returns a private key: no PKCS#12 upload, no `loadPrivateKey`. The current
-  credentials are replaced, not migrated.
+- **Users of the configuration:** their leaves are issued under one test CA
+  (`Fikua DSS Mock TSP Root CA (test)`) and their keys are mounted as files.
+  Issue no new leaf under it.
+- **Since 0.12.0 (fikua-docs ADR 0022, accepted; #9):** Fikua Sign creates the
+  keys of the credentials of its database, gives a CSR and activates the
+  credential with the certificate of an issuing CA that is outside the service.
+  It never imports or returns a private key: no PKCS#12 upload, no
+  `loadPrivateKey`. The credentials of the configuration are replaced, not
+  migrated.
 - Outside local development, never sign with a self-signed certificate. The only exception is the list
   signer (ETSI TS 119 612, clause 5.7.1), created by an operator command, not by
   the API.
