@@ -16,8 +16,10 @@ One user per calling system (the Lab issuer, verifier and Wallet Provider are th
 
 ## Keys and certificates
 
-- **Today**, each credential's certificate and key are files mounted at `/certs/`.
-- **Decided, not built yet** ([#9](https://github.com/fikua/fikua-digital-signature-service/issues/9)): Fikua Sign creates the key of each credential, gives a CSR, and activates the credential when it receives the certificate a CA issued for that key. Private keys are never imported or returned. A credential waiting for its certificate does not sign, and revoking one destroys its key.
+- **Credentials of the database** (since 0.12.0, [#9](https://github.com/fikua/fikua-digital-signature-service/issues/9)): Fikua Sign creates the key of each credential, gives a CSR, and activates the credential when it receives the certificate a CA issued for that key. Private keys are never imported or returned. A credential waiting for its certificate does not sign, and revoking one destroys its key. See [Key store](#key-store).
+- **Credentials of the configuration** (`DSS_USERS_<n>_*`): certificate and key are files mounted at `/certs/`, until they are replaced.
+
+Architecture, decisions (PKI, users and Keycloak, key custody) and status: [fikua-docs, Fikua Sign](https://github.com/fikua/fikua-docs/tree/main/docs/fikua-sign).
 
 ## Endpoints
 
