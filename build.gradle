@@ -88,7 +88,7 @@ tasks.named('jacocoTestReport') {
 group = 'com.fikua'
 // The release version: the v<version> tag must match it (checked below), and it
 // becomes the jar's version and the telemetry's service.version (build-info).
-version = '0.11.0'
+version = '0.12.0'
 
 java {
     toolchain {

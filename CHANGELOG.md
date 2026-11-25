@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-25
+
 ### Added
 - **Users and credentials in PostgreSQL**, optional (`DSS_DATABASE_URL`, `DSS_DATABASE_USERNAME`,
   `DSS_DATABASE_PASSWORD`; migrated with Flyway at start). The users of the configuration
